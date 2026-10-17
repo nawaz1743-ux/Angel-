@@ -139,7 +139,10 @@ fun SettingsScreen(
                                     )
 
                                     Text(
-                                        text = lang.description,
+                                        text = if (lang == AssistantLanguage.HINGLISH)
+                                        "Roman Hinglish only"
+                                         else
+                                        "English language mode",
                                         fontSize = 10.sp,
                                         color = Slate400
                                     )
