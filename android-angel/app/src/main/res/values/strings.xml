@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Angel</string>
+    <string name="accessibility_service_description">Angel Screen Understanding safely assists with reading visible screen text for personal assistance tasks. Passive observation only; does not perform unauthorized clicks.</string>
+</resources>

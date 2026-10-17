@@ -1,0 +1,6 @@
+{
+  "name": "Angel - Android AI Assistant",
+  "description": "Angel is a personal Android AI assistant with Hinglish and English voice chat, phone intents, quick tools, and screen assistance.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

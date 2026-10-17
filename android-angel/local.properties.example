@@ -1,0 +1,8 @@
+## This file must NOT be checked into Version Control Systems.
+# Location of the Android SDK.
+# Windows: sdk.dir=C\:\\Users\\Username\\AppData\\Local\\Android\\Sdk
+# macOS:   sdk.dir=/Users/Username/Library/Android/sdk
+# Linux:   sdk.dir=/home/username/Android/Sdk
+
+# Optional Google AI Studio Gemini API Key:
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
