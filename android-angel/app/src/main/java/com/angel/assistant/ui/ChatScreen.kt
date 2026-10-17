@@ -310,7 +310,7 @@ private fun MessageBubble(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = message.provider,
+                            text = message.provider?: "AngelAssistant", 
                             fontSize = 9.sp,
                             color = Slate400
                         )
