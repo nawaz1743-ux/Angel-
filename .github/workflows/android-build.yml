@@ -1,9 +1,13 @@
-name: Android Build
+name: Angel Android APK Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -13,11 +17,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'zulu'
+          distribution: temurin
+          java-version: "17"
 
-      - name: Verify Java
-        run: java -version
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Build Angel APK
+        working-directory: android-angel
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload Angel APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Angel-Android-APK
+          path: android-angel/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
