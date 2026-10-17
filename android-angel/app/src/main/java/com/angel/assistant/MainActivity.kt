@@ -238,6 +238,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        voiceManager.release()
+        voiceManager.destroy()
     }
 }
