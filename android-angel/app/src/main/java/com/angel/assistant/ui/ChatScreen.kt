@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -23,8 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -74,14 +79,12 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    // Sync speech transcript into input field
     LaunchedEffect(transcript) {
         if (transcript.isNotBlank()) {
             inputText = transcript
         }
     }
 
-    // Auto-scroll to bottom on new message
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -108,13 +111,15 @@ fun ChatScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Slate950)
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .imePadding()
     ) {
-        // Top Header
+        // TOP HEADER
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Slate900)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -127,15 +132,15 @@ fun ChatScreen(
 
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(38.dp)
                     .background(VioletPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
+                    contentDescription = "Angel AI",
                     tint = Slate100,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(21.dp)
                 )
             }
 
@@ -146,15 +151,32 @@ fun ChatScreen(
                     fontWeight = FontWeight.Bold,
                     color = Slate100
                 )
+
                 Text(
-                    text = if (language == AssistantLanguage.ENGLISH) "English Mode" else "Hinglish (Roman Script)",
+                    text = if (language == AssistantLanguage.ENGLISH) {
+                        "English Mode"
+                    } else {
+                        "Hinglish • Roman Script"
+                    },
                     fontSize = 11.sp,
                     color = CyanAccent
                 )
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = when {
+                    isListening -> "Listening"
+                    isSpeaking -> "Speaking"
+                    else -> "Online"
+                },
+                fontSize = 10.sp,
+                color = CyanAccent
+            )
         }
 
-        // Message List
+        // CHAT MESSAGES
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -172,22 +194,25 @@ fun ChatScreen(
             }
         }
 
-        // Quick Prompt Chips
+        // QUICK PROMPTS
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Slate950)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(quickPrompts) { prompt ->
                 Button(
-                    onClick = {
-                        onSendMessage(prompt)
-                    },
+                    onClick = { onSendMessage(prompt) },
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Slate900),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Slate900
+                    ),
+                    contentPadding = PaddingValues(
+                        horizontal = 12.dp,
+                        vertical = 6.dp
+                    )
                 ) {
                     Text(
                         text = prompt,
@@ -198,37 +223,46 @@ fun ChatScreen(
             }
         }
 
-        // Bottom Input Row
+        // BOTTOM MESSAGE INPUT
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Slate900)
-                .padding(8.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Voice Mic Button
+            // MICROPHONE
             IconButton(
                 onClick = onMicClick,
                 modifier = Modifier
-                    .background(if (isListening) RoseError else Slate800, CircleShape)
-                    .size(46.dp)
+                    .size(44.dp)
+                    .background(
+                        if (isListening) RoseError else Slate800,
+                        CircleShape
+                    )
             ) {
                 Icon(
                     imageVector = Icons.Default.Mic,
-                    contentDescription = "Voice Input",
+                    contentDescription = "Voice input",
                     tint = Slate100
                 )
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Text Input
+            // TEXT FIELD
             OutlinedTextField(
                 value = inputText,
                 onValueChange = { inputText = it },
                 placeholder = {
                     Text(
-                        text = if (language == AssistantLanguage.ENGLISH) "Ask Angel anything..." else "Kuch bhi poochiye...",
+                        text = if (
+                            language == AssistantLanguage.ENGLISH
+                        ) {
+                            "Ask Angel anything..."
+                        } else {
+                            "Kuch bhi poochiye..."
+                        },
                         color = Slate400,
                         fontSize = 13.sp
                     )
@@ -241,17 +275,19 @@ fun ChatScreen(
                     focusedBorderColor = VioletPrimary,
                     unfocusedBorderColor = Slate800,
                     focusedTextColor = Slate100,
-                    unfocusedTextColor = Slate100
+                    unfocusedTextColor = Slate100,
+                    cursorColor = CyanAccent
                 ),
                 singleLine = true
             )
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Send Button
+            // SEND BUTTON
             IconButton(
                 onClick = {
                     val clean = inputText.trim()
+
                     if (clean.isNotBlank()) {
                         onSendMessage(clean)
                         inputText = ""
@@ -259,12 +295,19 @@ fun ChatScreen(
                 },
                 enabled = inputText.isNotBlank(),
                 modifier = Modifier
-                    .background(if (inputText.isNotBlank()) VioletPrimary else Slate800, CircleShape)
-                    .size(46.dp)
+                    .size(44.dp)
+                    .background(
+                        if (inputText.isNotBlank()) {
+                            VioletPrimary
+                        } else {
+                            Slate800
+                        },
+                        CircleShape
+                    )
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
+                    contentDescription = "Send message",
                     tint = Slate100
                 )
             }
@@ -278,9 +321,14 @@ private fun MessageBubble(
     onSpeak: () -> Unit
 ) {
     val isUser = message.isFromUser
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isUser) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        }
     ) {
         Card(
             shape = RoundedCornerShape(
@@ -304,22 +352,24 @@ private fun MessageBubble(
 
                 if (!isUser) {
                     Spacer(modifier = Modifier.height(6.dp))
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = message.provider?: "AngelAssistant", 
+                            text = message.provider ?: "Angel Assistant",
                             fontSize = 9.sp,
                             color = Slate400
                         )
+
                         Icon(
                             imageVector = Icons.Default.VolumeUp,
                             contentDescription = "Read aloud",
                             tint = CyanAccent,
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(20.dp)
                                 .clickable { onSpeak() }
                         )
                     }
