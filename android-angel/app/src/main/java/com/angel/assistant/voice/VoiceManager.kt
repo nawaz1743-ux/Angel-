@@ -22,54 +22,121 @@ class VoiceManager(
     private var textToSpeech: TextToSpeech? = null
     private var isTtsReady = false
 
+    private var currentUtteranceId: String? = null
+
+    companion object {
+        private const val TAG = "VoiceManager"
+
+        // Natural, conversational delivery.
+        private const val NATURAL_SPEECH_RATE = 0.94f
+        private const val NATURAL_PITCH = 1.03f
+    }
+
     init {
         try {
             if (SpeechRecognizer.isRecognitionAvailable(context)) {
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                    setRecognitionListener(createRecognitionListener())
-                }
+                speechRecognizer =
+                    SpeechRecognizer.createSpeechRecognizer(context).apply {
+                        setRecognitionListener(createRecognitionListener())
+                    }
             }
-            textToSpeech = TextToSpeech(context.applicationContext, this)
+
+            textToSpeech = TextToSpeech(
+                context.applicationContext,
+                this
+            )
         } catch (e: Exception) {
-            Log.e("VoiceManager", "Initialization error: ${e.message}", e)
+            Log.e(TAG, "Initialization error: ${e.message}", e)
         }
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            isTtsReady = true
-            textToSpeech?.language = Locale("en", "IN")
-            textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    onSpeakingStateChanged(true)
+            val tts = textToSpeech ?: return
+
+            try {
+                val localeResult = tts.setLanguage(Locale("en", "IN"))
+
+                if (localeResult == TextToSpeech.LANG_MISSING_DATA ||
+                    localeResult == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    Log.w(TAG, "English India voice is unavailable")
                 }
 
-                override fun onDone(utteranceId: String?) {
-                    onSpeakingStateChanged(false)
-                }
+                // Slightly slower speech can sound more conversational.
+                tts.setSpeechRate(NATURAL_SPEECH_RATE)
+                tts.setPitch(NATURAL_PITCH)
 
-                @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    onSpeakingStateChanged(false)
-                }
-            })
+                tts.setOnUtteranceProgressListener(
+                    object : UtteranceProgressListener() {
+
+                        override fun onStart(utteranceId: String?) {
+                            onSpeakingStateChanged(true)
+                        }
+
+                        override fun onDone(utteranceId: String?) {
+                            onSpeakingStateChanged(false)
+                        }
+
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(utteranceId: String?) {
+                            onSpeakingStateChanged(false)
+                        }
+
+                        override fun onError(
+                            utteranceId: String?,
+                            errorCode: Int
+                        ) {
+                            Log.w(
+                                TAG,
+                                "TTS error for $utteranceId: $errorCode"
+                            )
+                            onSpeakingStateChanged(false)
+                        }
+                    }
+                )
+
+                isTtsReady = true
+
+                Log.d(TAG, "TextToSpeech initialized successfully")
+            } catch (e: Exception) {
+                isTtsReady = false
+                Log.e(TAG, "TTS setup error: ${e.message}", e)
+            }
         } else {
-            Log.w("VoiceManager", "TextToSpeech init failed with status: $status")
+            isTtsReady = false
+            Log.w(TAG, "TextToSpeech initialization failed: $status")
         }
     }
 
     fun startListening(language: AssistantLanguage) {
         val recognizer = speechRecognizer ?: return
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, language.code)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+
+        val intent = Intent(
+            RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+        ).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                language.code
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                true
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_MAX_RESULTS,
+                3
+            )
         }
+
         try {
             recognizer.startListening(intent)
         } catch (e: Exception) {
-            Log.e("VoiceManager", "startListening error: ${e.message}", e)
+            Log.e(TAG, "startListening error: ${e.message}", e)
         }
     }
 
@@ -77,63 +144,283 @@ class VoiceManager(
         try {
             speechRecognizer?.stopListening()
         } catch (e: Exception) {
-            Log.e("VoiceManager", "stopListening error: ${e.message}", e)
+            Log.e(TAG, "stopListening error: ${e.message}", e)
         }
     }
 
-    fun speak(text: String, language: AssistantLanguage) {
-        if (!isTtsReady || textToSpeech == null) return
-        val cleanText = text
-            .replace(Regex("[#*`_]"), "")
-            .replace(Regex("https?://\\S+"), "link")
+    /**
+     * Speaks the response using the currently selected language.
+     */
+    fun speak(
+        text: String,
+        language: AssistantLanguage
+    ) {
+        if (!isTtsReady) {
+            Log.w(TAG, "TTS is not ready yet")
+            return
+        }
 
-        val locale = if (language == AssistantLanguage.HINGLISH) {
-            Locale("hi", "IN")
+        val tts = textToSpeech ?: return
+        val cleanText = prepareTextForSpeech(text, language)
+
+        if (cleanText.isBlank()) {
+            onSpeakingStateChanged(false)
+            return
+        }
+
+        try {
+            val locale = if (
+                language == AssistantLanguage.HINGLISH
+            ) {
+                Locale("hi", "IN")
+            } else {
+                Locale("en", "IN")
+            }
+
+            val languageResult = tts.setLanguage(locale)
+
+            if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+                languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+                Log.w(
+                    TAG,
+                    "Requested voice unavailable: $locale"
+                )
+
+                // Fall back to English India if the requested
+                // language is not supported by the installed TTS.
+                tts.setLanguage(Locale("en", "IN"))
+            }
+
+            // Keep delivery consistent when switching languages.
+            tts.setSpeechRate(NATURAL_SPEECH_RATE)
+            tts.setPitch(NATURAL_PITCH)
+
+            val utteranceId =
+                "angel_${System.currentTimeMillis()}"
+
+            currentUtteranceId = utteranceId
+
+            val params = Bundle().apply {
+                putString(
+                    TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
+                    utteranceId
+                )
+            }
+
+            val result = tts.speak(
+                cleanText,
+                TextToSpeech.QUEUE_FLUSH,
+                params,
+                utteranceId
+            )
+
+            if (result == TextToSpeech.ERROR) {
+                Log.e(TAG, "TTS could not start speaking")
+                onSpeakingStateChanged(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Speech error: ${e.message}", e)
+            onSpeakingStateChanged(false)
+        }
+    }
+
+    /**
+     * Cleans Markdown and converts common time expressions
+     * into speech-friendly words without modifying displayed text.
+     */
+    private fun prepareTextForSpeech(
+        text: String,
+        language: AssistantLanguage
+    ): String {
+        var result = text
+
+        // Remove fenced code blocks from spoken output.
+        result = result.replace(
+            Regex("```[\\s\\S]*?```"),
+            " Code block omitted. "
+        )
+
+        // Replace Markdown links with their readable labels.
+        result = result.replace(
+            Regex("\\[([^\\]]+)]\\([^)]+\\)")
+        ) { match ->
+            match.groupValues[1]
+        }
+
+        // Remove URLs because reading each URL aloud is usually
+        // confusing during a spoken conversation.
+        result = result.replace(
+            Regex("https?://\\S+|www\\.\\S+"),
+            " "
+        )
+
+        // Remove common Markdown heading, emphasis and quote markers.
+        result = result.replace(
+            Regex("(?m)^\\s{0,3}#{1,6}\\s*"),
+            ""
+        )
+        result = result.replace(
+            Regex("(?m)^\\s*>+\\s?"),
+            ""
+        )
+        result = result.replace(
+            Regex("[*_`~]+"),
+            ""
+        )
+
+        // Remove Markdown table separators and list markers.
+        result = result.replace(
+            Regex("(?m)^\\s*[-+•]\\s+"),
+            ""
+        )
+        result = result.replace(
+            Regex("(?m)^\\s*\\d+[.)]\\s+"),
+            ""
+        )
+        result = result.replace(
+            Regex("(?m)^\\s*\\|?\\s*:?-{3,}:?\\s*(\\|\\s*:?-{3,}:?\\s*)+\\|?\\s*$"),
+            ""
+        )
+
+        // Make common clock times easier for TTS to pronounce.
+        result = result.replace(
+            Regex(
+                "(?i)\\b(0?[1-9]|1[0-2]):([0-5][0-9])\\s*(AM|PM)\\b"
+            )
+        ) { match ->
+            val hour = match.groupValues[1].toInt()
+            val minute = match.groupValues[2].toInt()
+            val period = match.groupValues[3].uppercase(Locale.ROOT)
+
+            if (language == AssistantLanguage.HINGLISH) {
+                hinglishTime(hour, minute, period)
+            } else {
+                englishTime(hour, minute, period)
+            }
+        }
+
+        // Remove repeated whitespace while preserving sentence pauses.
+        result = result
+            .replace(Regex("[ \\t]+"), " ")
+            .replace(Regex("\\n{3,}"), "\n\n")
+            .trim()
+
+        return result
+    }
+
+    private fun hinglishTime(
+        hour: Int,
+        minute: Int,
+        period: String
+    ): String {
+        val hourWords = when (hour) {
+            1 -> "ek"
+            2 -> "do"
+            3 -> "teen"
+            4 -> "chaar"
+            5 -> "paanch"
+            6 -> "chhe"
+            7 -> "saat"
+            8 -> "aath"
+            9 -> "nau"
+            10 -> "das"
+            11 -> "gyarah"
+            12 -> "baarah"
+            else -> hour.toString()
+        }
+
+        val timeWords = when (minute) {
+            0 -> "$hourWords baje"
+            15 -> "$hourWords bajkar pandrah minute"
+            30 -> "$hourWords bajkar tees minute"
+            45 -> "$hourWords bajkar paintaalis minute"
+            else -> "$hourWords bajkar $minute minute"
+        }
+
+        val dayPart = if (period == "AM") {
+            "subah"
         } else {
-            Locale("en", "IN")
+            "shaam"
         }
-        textToSpeech?.language = locale
 
-        val params = Bundle().apply {
-            putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "angel_utterance_${System.currentTimeMillis()}")
+        return "$dayPart $timeWords"
+    }
+
+    private fun englishTime(
+        hour: Int,
+        minute: Int,
+        period: String
+    ): String {
+        val hourWords = hour.toString()
+        val minuteWords = if (minute == 0) {
+            ""
+        } else {
+            " $minute"
         }
-        textToSpeech?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, "angel_speech")
+
+        val dayPart = if (period == "AM") {
+            "A M"
+        } else {
+            "P M"
+        }
+
+        return "$hourWords$minuteWords $dayPart"
     }
 
     private fun createRecognitionListener(): RecognitionListener {
         return object : RecognitionListener {
+
             override fun onReadyForSpeech(params: Bundle?) {}
+
             override fun onBeginningOfSpeech() {}
+
             override fun onRmsChanged(rmsdB: Float) {}
+
             override fun onBufferReceived(buffer: ByteArray?) {}
+
             override fun onEndOfSpeech() {}
+
             override fun onError(error: Int) {
-                Log.w("VoiceManager", "Recognition error code: $error")
+                Log.w(TAG, "Recognition error code: $error")
             }
 
             override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val matches = results?.getStringArrayList(
+                    SpeechRecognizer.RESULTS_RECOGNITION
+                )
                 val text = matches?.firstOrNull() ?: ""
                 onTranscript(text, true)
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
-                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val matches = partialResults?.getStringArrayList(
+                    SpeechRecognizer.RESULTS_RECOGNITION
+                )
                 val text = matches?.firstOrNull() ?: ""
                 onTranscript(text, false)
             }
 
-            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onEvent(
+                eventType: Int,
+                params: Bundle?
+            ) {}
         }
     }
 
     fun destroy() {
         try {
+            isTtsReady = false
             speechRecognizer?.destroy()
+            speechRecognizer = null
+
             textToSpeech?.stop()
             textToSpeech?.shutdown()
+            textToSpeech = null
+
+            onSpeakingStateChanged(false)
         } catch (e: Exception) {
-            Log.e("VoiceManager", "destroy error: ${e.message}", e)
+            Log.e(TAG, "destroy error: ${e.message}", e)
         }
     }
 }
