@@ -111,6 +111,7 @@ fun ChatScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Slate950)
+            .windowInsetsPadding(WindowInsets.statusBars)
             .windowInsetsPadding(WindowInsets.navigationBars)
             .imePadding()
     ) {
