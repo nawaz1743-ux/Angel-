@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -46,7 +46,6 @@ import com.angel.assistant.theme.EmeraldGreen
 import com.angel.assistant.theme.RoseError
 import com.angel.assistant.theme.Slate100
 import com.angel.assistant.theme.Slate400
-import com.angel.assistant.theme.Slate800
 import com.angel.assistant.theme.Slate900
 import com.angel.assistant.theme.Slate950
 import com.angel.assistant.theme.VioletPrimary
@@ -69,8 +68,8 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Slate950)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars)
+            // Protect content from status bar, navigation bar and display cutouts.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Column(
             modifier = Modifier
@@ -80,7 +79,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // TOP BAR
+            // TOP HEADER
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -113,9 +112,11 @@ fun HomeScreen(
                         )
                     ) {
                         Text(
-                            text = if (
-                                language == AssistantLanguage.ENGLISH
-                            ) "English" else "Hinglish",
+                            text = if (language == AssistantLanguage.ENGLISH) {
+                                "English"
+                            } else {
+                                "Hinglish"
+                            },
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = CyanAccent
@@ -140,7 +141,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // ANGEL AVATAR
+            // ANIMATED FULL-BODY ANGEL AVATAR
             AngelAvatar(
                 isListening = isListening,
                 isSpeaking = isSpeaking,
@@ -160,9 +161,7 @@ fun HomeScreen(
             )
 
             Text(
-                text = if (
-                    language == AssistantLanguage.ENGLISH
-                ) {
+                text = if (language == AssistantLanguage.ENGLISH) {
                     "Your Personal AI Assistant"
                 } else {
                     "Aapki Personal AI Assistant"
@@ -173,7 +172,7 @@ fun HomeScreen(
                 modifier = Modifier.padding(top = 5.dp)
             )
 
-            // STATUS
+            // LIVE VOICE STATUS
             Row(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -181,7 +180,14 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .size(8.dp)
-                        .background(EmeraldGreen, CircleShape)
+                        .background(
+                            color = when {
+                                isListening -> RoseError
+                                isSpeaking -> CyanAccent
+                                else -> EmeraldGreen
+                            },
+                            shape = CircleShape
+                        )
                 )
 
                 Text(
@@ -225,7 +231,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // VOICE BUTTON
+            // VOICE INPUT BUTTON
             Button(
                 onClick = onMicClick,
                 modifier = Modifier
@@ -233,11 +239,7 @@ fun HomeScreen(
                     .height(54.dp),
                 shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isListening) {
-                        RoseError
-                    } else {
-                        Slate900
-                    }
+                    containerColor = if (isListening) RoseError else Slate900
                 )
             ) {
                 Icon(
