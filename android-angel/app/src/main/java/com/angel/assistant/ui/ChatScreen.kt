@@ -8,15 +8,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -111,8 +110,10 @@ fun ChatScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Slate950)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars)
+            .statusBarsPadding()
+            .windowInsetsPadding(
+                androidx.compose.foundation.layout.WindowInsets.navigationBars
+            )
             .imePadding()
     ) {
         // TOP HEADER
@@ -232,7 +233,6 @@ fun ChatScreen(
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // MICROPHONE
             IconButton(
                 onClick = onMicClick,
                 modifier = Modifier
@@ -251,7 +251,6 @@ fun ChatScreen(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // TEXT FIELD
             OutlinedTextField(
                 value = inputText,
                 onValueChange = { inputText = it },
@@ -284,7 +283,6 @@ fun ChatScreen(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // SEND BUTTON
             IconButton(
                 onClick = {
                     val clean = inputText.trim()
