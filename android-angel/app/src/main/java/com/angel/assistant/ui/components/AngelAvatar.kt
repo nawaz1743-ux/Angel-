@@ -6,36 +6,29 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.angel.assistant.R
 import com.angel.assistant.theme.CyanAccent
 import com.angel.assistant.theme.RoseError
-import com.angel.assistant.theme.Slate100
-import com.angel.assistant.theme.VioletDark
-import com.angel.assistant.theme.VioletLight
 import com.angel.assistant.theme.VioletPrimary
 
 @Composable
@@ -46,104 +39,113 @@ fun AngelAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 160.dp
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "avatarPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.08f,
+    val transition = rememberInfiniteTransition(label = "angel_animation")
+
+    val breathing by transition.animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(
+                durationMillis = 1800,
+                easing = FastOutSlowInEasing
+            ),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "scale"
+        label = "angel_breathing"
     )
 
-    val currentScale = if (isListening || isSpeaking) pulseScale else 1.0f
+    val listeningPulse by transition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 850,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "angel_listening_pulse"
+    )
 
-    val gradientBrush = when {
-        isListening -> Brush.radialGradient(
-            colors = listOf(RoseError, VioletDark, Color(0xFF1E1035))
-        )
-        isSpeaking -> Brush.radialGradient(
-            colors = listOf(CyanAccent, VioletPrimary, Color(0xFF0F0B26))
-        )
-        else -> Brush.radialGradient(
-            colors = listOf(VioletLight, VioletPrimary, Color(0xFF0A071E))
-        )
+    val speakingPulse by transition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 500,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "angel_speaking_pulse"
+    )
+
+    val ringScale = when {
+        isListening -> listeningPulse
+        isSpeaking -> speakingPulse
+        else -> breathing
+    }
+
+    val ringColor = when {
+        isListening -> RoseError
+        isSpeaking -> CyanAccent
+        else -> VioletPrimary
+    }
+
+    val description = when {
+        isListening -> "Angel is listening. Tap to stop."
+        isSpeaking -> "Angel is speaking."
+        else -> "Angel AI assistant. Tap to speak."
     }
 
     Box(
-        contentAlignment = Alignment.Center,
         modifier = modifier
             .size(size)
-            .scale(currentScale)
+            .scale(if (isListening || isSpeaking) ringScale else breathing)
             .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = description
+            },
+        contentAlignment = Alignment.Center
     ) {
-        // Outer Glow Aura
-        Box(
-            modifier = Modifier
-                .size(size)
-                .background(
-                    color = (if (isListening) RoseError else VioletPrimary).copy(alpha = 0.25f),
-                    shape = CircleShape
-                )
-        )
-
-        // Core Orb Body
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(size * 0.82f)
-                .background(brush = gradientBrush, shape = CircleShape)
+        // Animated holographic rings
+        Canvas(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                when {
-                    isListening -> {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Listening",
-                            tint = Slate100,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Sun rahi hoon...",
-                            color = Slate100,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    isSpeaking -> {
-                        Icon(
-                            imageVector = Icons.Default.VolumeUp,
-                            contentDescription = "Speaking",
-                            tint = Slate100,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Angel bol rahi hai...",
-                            color = Slate100,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    else -> {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = "Angel Ready",
-                            tint = Slate100,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Angel",
-                            color = Slate100,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
+            val centerX = this.size.width / 2f
+            val centerY = this.size.height / 2f
+            val baseRadius = this.size.minDimension * 0.43f
+
+            drawCircle(
+                color = ringColor.copy(alpha = 0.14f),
+                radius = baseRadius * ringScale,
+                center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                style = Stroke(width = 2.dp.toPx())
+            )
+
+            drawCircle(
+                color = ringColor.copy(alpha = 0.28f),
+                radius = baseRadius * 0.86f * ringScale,
+                center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+
+            drawCircle(
+                color = ringColor.copy(alpha = 0.12f),
+                radius = baseRadius * 0.70f,
+                center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                style = Stroke(width = 1.dp.toPx())
+            )
         }
+
+        // Full-body Angel image uploaded to drawable-nodpi
+        Image(
+            painter = painterResource(id = R.drawable.angel_full_body),
+            contentDescription = "Angel full-body character",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(size * 0.04f)
+        )
     }
 }
