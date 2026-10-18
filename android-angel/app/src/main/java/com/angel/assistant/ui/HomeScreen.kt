@@ -6,13 +6,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Chat
@@ -31,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.angel.assistant.data.model.AssistantLanguage
@@ -62,210 +69,293 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Slate950)
-            .padding(16.dp)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar
+
+            // TOP BAR
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Language Switcher Badge
-                Button(
-                    onClick = onToggleLanguage,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Slate900)
-                ) {
+                Column {
                     Text(
-                        text = language.displayName,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CyanAccent
+                        text = "ANGEL AI",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Slate100,
+                        letterSpacing = 2.sp
+                    )
+
+                    Text(
+                        text = "YOUR PERSONAL AI",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = CyanAccent,
+                        letterSpacing = 1.5.sp
                     )
                 }
 
-                // Settings Navigation Button
-                IconButton(
-                    onClick = onNavigateSettings,
-                    modifier = Modifier
-                        .background(Slate900, CircleShape)
-                        .size(42.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Slate100
-                    )
-                }
-            }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = onToggleLanguage,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Slate900
+                        )
+                    ) {
+                        Text(
+                            text = if (
+                                language == AssistantLanguage.ENGLISH
+                            ) "English" else "Hinglish",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CyanAccent
+                        )
+                    }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Center: Interactive Avatar
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AngelAvatar(
-                    isListening = isListening,
-                    isSpeaking = isSpeaking,
-                    onClick = onMicClick,
-                    size = 180.dp
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Text(
-                    text = "Angel",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = Slate100
-                )
-
-                Text(
-                    text = if (language == AssistantLanguage.ENGLISH)
-                        "Personal AI Assistant • Samsung Galaxy S26 Ultra"
-                    else
-                        "Aapki Personal AI Assistant • S26 Ultra",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Slate400,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-
-                // Ready Indicator
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Box(
+                    IconButton(
+                        onClick = onNavigateSettings,
                         modifier = Modifier
-                            .size(8.dp)
-                            .background(EmeraldGreen, CircleShape)
-                    )
-                    Text(
-                        text = if (isListening) "Sun rahi hoon..." else if (isSpeaking) "Bol rahi hoon..." else "Online & Ready",
-                        color = Slate400,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
+                            .padding(start = 4.dp)
+                            .background(Slate900, CircleShape)
+                            .size(42.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = Slate100
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // Bottom Navigation Card Grid
-            Column(
+            // ANGEL AVATAR
+            AngelAvatar(
+                isListening = isListening,
+                isSpeaking = isSpeaking,
+                onClick = onMicClick,
+                size = 170.dp
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Angel",
+                style = MaterialTheme.typography.headlineLarge,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                color = Slate100,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = if (
+                    language == AssistantLanguage.ENGLISH
+                ) {
+                    "Your Personal AI Assistant"
+                } else {
+                    "Aapki Personal AI Assistant"
+                },
+                fontSize = 13.sp,
+                color = Slate400,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 5.dp)
+            )
+
+            // STATUS
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(EmeraldGreen, CircleShape)
+                )
+
+                Text(
+                    text = when {
+                        isListening -> "Listening..."
+                        isSpeaking -> "Angel is speaking..."
+                        else -> "Online & Ready"
+                    },
+                    fontSize = 12.sp,
+                    color = CyanAccent,
+                    modifier = Modifier.padding(start = 7.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // MAIN CHAT BUTTON
+            Button(
+                onClick = onNavigateChat,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .height(58.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VioletPrimary
+                )
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Chat Action Card
-                    Card(
-                        onClick = onNavigateChat,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Slate900)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Chat, contentDescription = null, tint = VioletPrimary)
-                            Text(
-                                text = "Chat & Voice",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate100,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-                    }
+                Icon(
+                    imageVector = Icons.Default.Chat,
+                    contentDescription = null,
+                    tint = Slate100
+                )
 
-                    // Ads Approval Queue Card
-                    Card(
-                        onClick = onNavigateApprovals,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Slate900)
+                Text(
+                    text = "  Open Angel Chat",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate100
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // VOICE BUTTON
+            Button(
+                onClick = onMicClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isListening) {
+                        RoseError
+                    } else {
+                        Slate900
+                    }
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Microphone",
+                    tint = Slate100
+                )
+
+                Text(
+                    text = if (isListening) {
+                        "Listening... Tap to Stop"
+                    } else {
+                        "Hands-Free / Voice Input"
+                    },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate100,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // SECONDARY ACTIONS
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Card(
+                    onClick = onNavigateApprovals,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Slate900
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Campaign, contentDescription = null, tint = CyanAccent)
-                            Text(
-                                text = "Ads Approvals",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate100,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Campaign,
+                            contentDescription = null,
+                            tint = CyanAccent,
+                            modifier = Modifier.size(25.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(7.dp))
+
+                        Text(
+                            text = "Ads Approvals",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate100,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
 
-                // Screen Understanding Action
                 Card(
                     onClick = onInspectScreen,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Slate900)
+                    colors = CardDefaults.cardColors(
+                        containerColor = Slate900
+                    )
                 ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(Icons.Default.ScreenSearchDesktop, contentDescription = null, tint = Slate400)
-                        Column(modifier = Modifier.padding(start = 8.dp)) {
-                            Text(
-                                text = "Screen Understanding",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate100
-                            )
-                            Text(
-                                text = "Inspect active window via Accessibility (Consent-required)",
-                                fontSize = 10.sp,
-                                color = Slate400
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.ScreenSearchDesktop,
+                            contentDescription = null,
+                            tint = VioletPrimary,
+                            modifier = Modifier.size(25.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(7.dp))
+
+                        Text(
+                            text = "Screen Understanding",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate100,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
-
-                // Push-to-Talk Primary Bar
-                Button(
-                    onClick = onMicClick,
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isListening) RoseError else VioletPrimary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Microphone",
-                        tint = Slate100,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = if (isListening) "Listening... Tap to stop" else "Tap to Speak to Angel",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate100,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
             }
+
+            Spacer(modifier = Modifier.height(26.dp))
+
+            // CREATOR CREDIT
+            Text(
+                text = "DESIGNED & DEVELOPED BY",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                color = Slate400,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "SHAAN",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Slate100,
+                letterSpacing = 4.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 5.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
