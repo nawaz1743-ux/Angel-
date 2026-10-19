@@ -1,6 +1,14 @@
 package com.angel.assistant.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,30 +20,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.ScreenSearchDesktop
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,106 +71,193 @@ fun HomeScreen(
     onNavigateSettings: () -> Unit,
     onInspectScreen: () -> Unit,
     onToggleLanguage: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenMenu: () -> Unit = {}
 ) {
+    val transition = rememberInfiniteTransition(label = "home_glow")
+
+    val micPulse by transition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (isListening) 650 else 1200,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "microphone_pulse"
+    )
+
+    val statusColor = when {
+        isListening -> RoseError
+        isSpeaking -> CyanAccent
+        else -> EmeraldGreen
+    }
+
+    val statusText = when {
+        isListening -> if (language == AssistantLanguage.ENGLISH) {
+            "LISTENING TO YOU..."
+        } else {
+            "SUN RAHI HOON..."
+        }
+
+        isSpeaking -> if (language == AssistantLanguage.ENGLISH) {
+            "ANGEL IS SPEAKING..."
+        } else {
+            "ANGEL BOL RAHI HAI..."
+        }
+
+        else -> if (language == AssistantLanguage.ENGLISH) {
+            "ONLINE • READY"
+        } else {
+            "ONLINE • READY HOON"
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Slate950)
-            // Protect content from status bar, navigation bar and display cutouts.
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF10152E),
+                        Color(0xFF080B19),
+                        Slate950
+                    )
+                )
+            )
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 20.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            // TOP HEADER
+            // HEADER
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = "ANGEL AI",
-                        fontSize = 18.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Slate100,
-                        letterSpacing = 2.sp
+                        letterSpacing = 3.sp,
+                        color = Slate100
                     )
 
                     Text(
                         text = "YOUR PERSONAL AI",
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = CyanAccent,
-                        letterSpacing = 1.5.sp
+                        letterSpacing = 2.sp,
+                        color = CyanAccent
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(
-                        onClick = onToggleLanguage,
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Slate900
+                Surface(
+                    onClick = onToggleLanguage,
+                    shape = RoundedCornerShape(20.dp),
+                    color = Slate900,
+                    contentColor = CyanAccent
+                ) {
+                    Text(
+                        text = if (
+                            language == AssistantLanguage.ENGLISH
+                        ) {
+                            "EN"
+                        } else {
+                            "HINGLISH"
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(
+                            horizontal = 12.dp,
+                            vertical = 10.dp
                         )
-                    ) {
-                        Text(
-                            text = if (language == AssistantLanguage.ENGLISH) {
-                                "English"
-                            } else {
-                                "Hinglish"
-                            },
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = CyanAccent
-                        )
-                    }
+                    )
+                }
 
-                    IconButton(
-                        onClick = onNavigateSettings,
-                        modifier = Modifier
-                            .padding(start = 4.dp)
-                            .background(Slate900, CircleShape)
-                            .size(42.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = Slate100
-                        )
-                    }
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = onNavigateSettings,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(Slate900, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Slate100
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                IconButton(
+                    onClick = onOpenMenu,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(Slate900, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open Angel Menu",
+                        tint = CyanAccent
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // ANIMATED FULL-BODY ANGEL AVATAR
-            AngelAvatar(
-                isListening = isListening,
-                isSpeaking = isSpeaking,
-                onClick = onMicClick,
-                size = 170.dp
-            )
+            // CHARACTER AND HOLOGRAPHIC BACKGROUND
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(260.dp)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    VioletPrimary.copy(alpha = 0.24f),
+                                    CyanAccent.copy(alpha = 0.09f),
+                                    Color.Transparent
+                                )
+                            ),
+                            CircleShape
+                        )
+                )
 
-            Spacer(modifier = Modifier.height(14.dp))
+                AngelAvatar(
+                    isListening = isListening,
+                    isSpeaking = isSpeaking,
+                    onClick = onMicClick,
+                    size = 250.dp
+                )
+            }
 
             Text(
                 text = "Angel",
-                style = MaterialTheme.typography.headlineLarge,
                 fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
                 color = Slate100,
+                letterSpacing = 1.5.sp,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = if (language == AssistantLanguage.ENGLISH) {
+                text = if (
+                    language == AssistantLanguage.ENGLISH
+                ) {
                     "Your Personal AI Assistant"
                 } else {
                     "Aapki Personal AI Assistant"
@@ -169,179 +265,137 @@ fun HomeScreen(
                 fontSize = 13.sp,
                 color = Slate400,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 5.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
 
-            // LIVE VOICE STATUS
+            // STATUS
             Row(
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
-                        .background(
-                            color = when {
-                                isListening -> RoseError
-                                isSpeaking -> CyanAccent
-                                else -> EmeraldGreen
-                            },
-                            shape = CircleShape
-                        )
+                        .background(statusColor, CircleShape)
                 )
 
                 Text(
-                    text = when {
-                        isListening -> "Listening..."
-                        isSpeaking -> "Angel is speaking..."
-                        else -> "Online & Ready"
-                    },
-                    fontSize = 12.sp,
-                    color = CyanAccent,
-                    modifier = Modifier.padding(start = 7.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // MAIN CHAT BUTTON
-            Button(
-                onClick = onNavigateChat,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = VioletPrimary
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Chat,
-                    contentDescription = null,
-                    tint = Slate100
-                )
-
-                Text(
-                    text = "  Open Angel Chat",
-                    fontSize = 15.sp,
+                    text = statusText,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Slate100
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // VOICE INPUT BUTTON
-            Button(
-                onClick = onMicClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isListening) RoseError else Slate900
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = "Microphone",
-                    tint = Slate100
-                )
-
-                Text(
-                    text = if (isListening) {
-                        "Listening... Tap to Stop"
-                    } else {
-                        "Hands-Free / Voice Input"
-                    },
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Slate100,
+                    letterSpacing = 1.2.sp,
+                    color = statusColor,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // SECONDARY ACTIONS
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // GLOWING MICROPHONE
+            Box(
+                modifier = Modifier
+                    .size(86.dp)
+                    .scale(micPulse)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                if (isListening) {
+                                    RoseError.copy(alpha = 0.38f)
+                                } else {
+                                    CyanAccent.copy(alpha = 0.30f)
+                                },
+                                VioletPrimary.copy(alpha = 0.12f),
+                                Color.Transparent
+                            )
+                        ),
+                        CircleShape
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isListening) {
+                            RoseError
+                        } else {
+                            CyanAccent.copy(alpha = 0.7f)
+                        },
+                        shape = CircleShape
+                    )
+                    .clickable(onClick = onMicClick),
+                contentAlignment = Alignment.Center
             ) {
-                Card(
-                    onClick = onNavigateApprovals,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Slate900
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Campaign,
-                            contentDescription = null,
-                            tint = CyanAccent,
-                            modifier = Modifier.size(25.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(7.dp))
-
-                        Text(
-                            text = "Ads Approvals",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Slate100,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                Card(
-                    onClick = onInspectScreen,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Slate900
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ScreenSearchDesktop,
-                            contentDescription = null,
-                            tint = VioletPrimary,
-                            modifier = Modifier.size(25.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(7.dp))
-
-                        Text(
-                            text = "Screen Understanding",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Slate100,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = if (isListening) {
+                        "Stop voice input"
+                    } else {
+                        "Talk to Angel"
+                    },
+                    tint = Slate100,
+                    modifier = Modifier.size(38.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(26.dp))
+            Text(
+                text = if (isListening) {
+                    if (language == AssistantLanguage.ENGLISH) {
+                        "TAP TO STOP"
+                    } else {
+                        "ROKNE KE LIYE TAP KAREIN"
+                    }
+                } else {
+                    if (language == AssistantLanguage.ENGLISH) {
+                        "TAP TO TALK TO ANGEL"
+                    } else {
+                        "ANGEL SE BAAT KARNE KE LIYE TAP KAREIN"
+                    }
+                },
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate400,
+                letterSpacing = 1.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // SCREEN UNDERSTANDING
+            Button(
+                onClick = onInspectScreen,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Slate900
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ScreenSearchDesktop,
+                    contentDescription = null,
+                    tint = CyanAccent
+                )
+
+                Text(
+                    text = if (
+                        language == AssistantLanguage.ENGLISH
+                    ) {
+                        "Screen Understanding"
+                    } else {
+                        "Screen Ko Samjho"
+                    },
+                    color = Slate100,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 9.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(17.dp))
 
             // CREATOR CREDIT
             Text(
                 text = "DESIGNED & DEVELOPED BY",
                 fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
                 color = Slate400,
                 letterSpacing = 2.sp,
                 textAlign = TextAlign.Center
@@ -349,15 +403,15 @@ fun HomeScreen(
 
             Text(
                 text = "SHAAN",
-                fontSize = 20.sp,
+                fontSize = 19.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Slate100,
-                letterSpacing = 4.sp,
+                letterSpacing = 5.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 5.dp)
+                modifier = Modifier.padding(top = 3.dp)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
