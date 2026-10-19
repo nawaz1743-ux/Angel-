@@ -29,6 +29,7 @@ import com.angel.assistant.theme.Slate950
 import com.angel.assistant.ui.ApprovalScreen
 import com.angel.assistant.ui.ChatScreen
 import com.angel.assistant.ui.HomeScreen
+import com.angel.assistant.ui.MenuScreen
 import com.angel.assistant.ui.SettingsScreen
 import com.angel.assistant.voice.VoiceManager
 import com.angel.assistant.workflow.GoogleAdsApprovalWorkflow
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 
 enum class Screen {
     HOME,
+    MENU,
     CHAT,
     APPROVALS,
     SETTINGS
@@ -44,6 +46,7 @@ enum class Screen {
 class MainActivity : ComponentActivity() {
 
     private lateinit var voiceManager: VoiceManager
+
     private val geminiClient = GeminiApiClient()
     private val adsWorkflow = GoogleAdsApprovalWorkflow()
 
@@ -54,16 +57,21 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
+        val recordAudioGranted =
+            permissions[Manifest.permission.RECORD_AUDIO] ?: false
+
         if (recordAudioGranted) {
-            Toast.makeText(this, "Microphone permission granted", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Microphone permission granted",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize Native Speech Manager
         voiceManager = VoiceManager(
             context = this,
             onTranscript = { text, isFinal ->
@@ -92,12 +100,18 @@ class MainActivity : ComponentActivity() {
         val permissionsToRequest = mutableListOf(
             Manifest.permission.RECORD_AUDIO
         )
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            permissionsToRequest.add(
+                Manifest.permission.POST_NOTIFICATIONS
+            )
         }
 
         val missing = permissionsToRequest.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                this,
+                it
+            ) != PackageManager.PERMISSION_GRANTED
         }
 
         if (missing.isNotEmpty()) {
@@ -107,8 +121,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun AngelAppContent() {
-        var currentScreen by remember { mutableStateOf(Screen.HOME) }
-        var currentLanguage by remember { mutableStateOf(AssistantLanguage.HINGLISH) }
+        var currentScreen by remember {
+            mutableStateOf(Screen.HOME)
+        }
+
+        var currentLanguage by remember {
+            mutableStateOf(AssistantLanguage.HINGLISH)
+        }
+
         val scope = rememberCoroutineScope()
 
         val messages = remember {
@@ -122,13 +142,20 @@ class MainActivity : ComponentActivity() {
         }
 
         val approvalItems by adsWorkflow.approvalQueue.collectAsState()
+
         val isListening by isListeningState
         val isSpeaking by isSpeakingState
         val transcript by transcriptState
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) return
-            messages.add(ChatMessage(text = userText, isFromUser = true))
+
+            messages.add(
+                ChatMessage(
+                    text = userText,
+                    isFromUser = true
+                )
+            )
 
             scope.launch {
                 val response = geminiClient.generateAngelResponse(
@@ -136,18 +163,27 @@ class MainActivity : ComponentActivity() {
                     history = messages,
                     language = currentLanguage
                 )
+
                 messages.add(
                     ChatMessage(
                         text = response,
                         isFromUser = false,
-                        provider = if (BuildConfig.GEMINI_API_KEY.isNotBlank() && BuildConfig.GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE")
+                        provider = if (
+                            BuildConfig.GEMINI_API_KEY.isNotBlank() &&
+                            BuildConfig.GEMINI_API_KEY !=
+                            "YOUR_GEMINI_API_KEY_HERE"
+                        ) {
                             "Gemini 2.5 Flash"
-                        else
+                        } else {
                             "Angel Assistant Engine (Offline)"
+                        }
                     )
                 )
-                // Speak out the response in female voice
-                voiceManager.speak(response, currentLanguage)
+
+                voiceManager.speak(
+                    response,
+                    currentLanguage
+                )
             }
         }
 
@@ -155,18 +191,24 @@ class MainActivity : ComponentActivity() {
             if (isListening) {
                 voiceManager.stopListening()
                 isListeningState.value = false
+
                 val spoken = transcript.trim()
+
                 if (spoken.isNotBlank()) {
                     handleSendMessage(spoken)
                     transcriptState.value = ""
                 }
             } else {
-                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
-                    != PackageManager.PERMISSION_GRANTED
+                if (
+                    ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.RECORD_AUDIO
+                    ) != PackageManager.PERMISSION_GRANTED
                 ) {
                     checkAndRequestPermissions()
                     return
                 }
+
                 transcriptState.value = ""
                 voiceManager.startListening(currentLanguage)
                 isListeningState.value = true
@@ -174,16 +216,27 @@ class MainActivity : ComponentActivity() {
         }
 
         when (currentScreen) {
+
             Screen.HOME -> HomeScreen(
                 language = currentLanguage,
                 isListening = isListening,
                 isSpeaking = isSpeaking,
-                onMicClick = { handleMicToggle() },
-                onNavigateChat = { currentScreen = Screen.CHAT },
-                onNavigateApprovals = { currentScreen = Screen.APPROVALS },
-                onNavigateSettings = { currentScreen = Screen.SETTINGS },
+                onMicClick = {
+                    handleMicToggle()
+                },
+                onNavigateChat = {
+                    currentScreen = Screen.CHAT
+                },
+                onNavigateApprovals = {
+                    currentScreen = Screen.APPROVALS
+                },
+                onNavigateSettings = {
+                    currentScreen = Screen.SETTINGS
+                },
                 onInspectScreen = {
-                    val screenText = AngelAccessibilityService.captureVisibleScreenText()
+                    val screenText =
+                        AngelAccessibilityService.captureVisibleScreenText()
+
                     messages.add(
                         ChatMessage(
                             text = "Screen Inspection Result:\n$screenText",
@@ -191,13 +244,45 @@ class MainActivity : ComponentActivity() {
                             provider = "Angel Accessibility Service"
                         )
                     )
+
                     currentScreen = Screen.CHAT
                 },
                 onToggleLanguage = {
-                    currentLanguage = if (currentLanguage == AssistantLanguage.HINGLISH)
-                        AssistantLanguage.ENGLISH
-                    else
-                        AssistantLanguage.HINGLISH
+                    currentLanguage =
+                        if (currentLanguage == AssistantLanguage.HINGLISH) {
+                            AssistantLanguage.ENGLISH
+                        } else {
+                            AssistantLanguage.HINGLISH
+                        }
+                }
+            )
+
+            Screen.MENU -> MenuScreen(
+                onBack = {
+                    currentScreen = Screen.HOME
+                },
+                onOpenChat = {
+                    currentScreen = Screen.CHAT
+                },
+                onOpenApprovals = {
+                    currentScreen = Screen.APPROVALS
+                },
+                onOpenSettings = {
+                    currentScreen = Screen.SETTINGS
+                },
+                onInspectScreen = {
+                    val screenText =
+                        AngelAccessibilityService.captureVisibleScreenText()
+
+                    messages.add(
+                        ChatMessage(
+                            text = "Screen Inspection Result:\n$screenText",
+                            isFromUser = false,
+                            provider = "Angel Accessibility Service"
+                        )
+                    )
+
+                    currentScreen = Screen.CHAT
                 }
             )
 
@@ -207,37 +292,66 @@ class MainActivity : ComponentActivity() {
                 isListening = isListening,
                 isSpeaking = isSpeaking,
                 transcript = transcript,
-                onSendMessage = { handleSendMessage(it) },
-                onMicClick = { handleMicToggle() },
-                onSpeakMessage = { voiceManager.speak(it, currentLanguage) },
-                onBack = { currentScreen = Screen.HOME }
+                onSendMessage = {
+                    handleSendMessage(it)
+                },
+                onMicClick = {
+                    handleMicToggle()
+                },
+                onSpeakMessage = {
+                    voiceManager.speak(it, currentLanguage)
+                },
+                onBack = {
+                    currentScreen = Screen.HOME
+                }
             )
 
             Screen.APPROVALS -> ApprovalScreen(
                 items = approvalItems,
-                onApprove = { adsWorkflow.approveItem(it) },
-                onReject = { adsWorkflow.rejectItem(it) },
-                onSimulate = { adsWorkflow.runSimulatedDryRun(it) },
-                onBack = { currentScreen = Screen.HOME }
+                onApprove = {
+                    adsWorkflow.approveItem(it)
+                },
+                onReject = {
+                    adsWorkflow.rejectItem(it)
+                },
+                onSimulate = {
+                    adsWorkflow.runSimulatedDryRun(it)
+                },
+                onBack = {
+                    currentScreen = Screen.MENU
+                }
             )
 
             Screen.SETTINGS -> SettingsScreen(
                 currentLanguage = currentLanguage,
-                onSelectLanguage = { currentLanguage = it },
-                onTestVoice = {
-                    val testPhrase = if (currentLanguage == AssistantLanguage.ENGLISH)
-                        "Hello Sir! I am Angel, your personal AI assistant."
-                    else
-                        "Hello Sir! Main Angel hoon, aapki personal AI assistant. Aawaz bilkul natural hai!"
-                    voiceManager.speak(testPhrase, currentLanguage)
+                onSelectLanguage = {
+                    currentLanguage = it
                 },
-                onBack = { currentScreen = Screen.HOME }
+                onTestVoice = {
+                    val testPhrase =
+                        if (currentLanguage == AssistantLanguage.ENGLISH) {
+                            "Hello Sir! I am Angel, your personal AI assistant."
+                        } else {
+                            "Hello Sir! Main Angel hoon, aapki personal AI assistant. Aawaz bilkul natural hai!"
+                        }
+
+                    voiceManager.speak(
+                        testPhrase,
+                        currentLanguage
+                    )
+                },
+                onBack = {
+                    currentScreen = Screen.MENU
+                }
             )
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        voiceManager.destroy()
+
+        if (::voiceManager.isInitialized) {
+            voiceManager.destroy()
+        }
     }
 }
