@@ -78,7 +78,9 @@ class MainActivity : ComponentActivity() {
                 transcriptState.value = text
             },
             onSpeakingStateChanged = { speaking ->
-                isSpeakingState.value = speaking
+                runOnUiThread {
+                    isSpeakingState.value = speaking
+                }
             }
         )
 
@@ -254,6 +256,9 @@ class MainActivity : ComponentActivity() {
                         } else {
                             AssistantLanguage.HINGLISH
                         }
+                },
+                onOpenMenu = {
+                    currentScreen = Screen.MENU
                 }
             )
 
