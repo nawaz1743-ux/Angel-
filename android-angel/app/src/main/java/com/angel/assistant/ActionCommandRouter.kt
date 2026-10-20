@@ -24,6 +24,13 @@ class ActionCommandRouter(private val context: Context) {
     fun requiresContactLookup(rawCommand: String): Boolean =
         extractContactCallName(rawCommand) != null
 
+    /** True only for explicit phone-call commands, not ordinary dialer preparation. */
+    fun requiresCallPermission(rawCommand: String): Boolean {
+        val command = rawCommand.trim()
+        return extractContactCallName(command) != null ||
+            Regex("""(?i)^call\s+number\s+\+?[0-9][0-9 ()-]{5,}$""").matches(command)
+    }
+
     fun handle(rawCommand: String): String? {
         val command = rawCommand.trim()
         val normalized = command.lowercase()
@@ -107,7 +114,27 @@ class ActionCommandRouter(private val context: Context) {
             return callContact(contactName)
         }
 
-        val dial = command.matchCommand(listOf("dial ", "number dial karo ", "call number "))
+        val directCall = command.matchCommand(listOf("call number "))
+        if (directCall != null) {
+            val digits = directCall.filter { it.isDigit() || it == '+' }
+            if (digits.length < 7) return "Sir, phone number clear nahi mila. Number dobara boliye."
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                return "Sir, direct phone call ke liye Phone permission allow karein, phir command dobara boliye."
+            }
+            return try {
+                context.startActivity(
+                    Intent(Intent.ACTION_CALL, Uri.parse("tel:$digits"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                "Phone call start kar di."
+            } catch (_: SecurityException) {
+                "Sir, phone-call permission nahi mili. Settings mein Angel ki Phone permission allow karein."
+            } catch (_: ActivityNotFoundException) {
+                "Is phone par call start nahi ho payi."
+            }
+        }
+
+        val dial = command.matchCommand(listOf("dial ", "number dial karo "))
         if (dial != null) {
             val digits = dial.filter { it.isDigit() || it == '+' }
             if (digits.length < 5) return "Sir, number clear nahi mila. Number dobara boliye."
@@ -247,14 +274,19 @@ class ActionCommandRouter(private val context: Context) {
             return "Sir, ek se zyada contacts mile. Kaunsa contact chahiye?\\n$choices"
         }
         val (contactName, number) = matches.first()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            return "Sir, direct call ke liye Phone permission allow karein, phir '$contactName ko call karo' dobara boliye."
+        }
         return try {
             context.startActivity(
-                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${number.filter { it.isDigit() || it == '+' }}"))
+                Intent(Intent.ACTION_CALL, Uri.parse("tel:${number.filter { it.isDigit() || it == '+' }}"))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
-            "$contactName ka number Dialer mein khol diya hai. Number check karke aap khud Call dabaiye."
+            "$contactName ko phone call start kar di."
+        } catch (_: SecurityException) {
+            "Sir, Phone permission allow nahi hui. Settings mein Angel ki Phone permission check karein."
         } catch (_: Exception) {
-            "Dialer open nahi ho paya."
+            "Phone call start nahi ho payi."
         }
     }
 
