@@ -1,5 +1,10 @@
 name: Angel Android APK Build
 
+# Keep the newest main build; cancel superseded runs to avoid a queue of stale APKs.
+concurrency:
+  group: angel-main-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
