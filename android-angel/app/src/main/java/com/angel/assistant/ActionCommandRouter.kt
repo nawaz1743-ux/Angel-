@@ -273,7 +273,7 @@ class ActionCommandRouter(private val context: Context) {
         val prefixes = listOf("call contact ", "dial contact ", "call karo ", "phone karo ", "call ")
         val prefix = prefixes.firstOrNull { command.startsWith(it, ignoreCase = true) } ?: return null
         val name = command.substring(prefix.length).trim()
-            .replace(Regex("(?i)\s+(ko call karo|ko phone karo|ko call|ko)$"), "")
+            .replace(Regex("""(?i)\s+(ko call karo|ko phone karo|ko call|ko)$"""), "")
             .trim()
         if (name.isBlank() || name.matches(Regex("[+0-9 ()-]+")) ||
             name.startsWith("number ", ignoreCase = true) ||
