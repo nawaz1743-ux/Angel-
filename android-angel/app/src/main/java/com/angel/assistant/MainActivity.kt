@@ -234,13 +234,31 @@ class MainActivity : ComponentActivity() {
                         // Give launched apps time to become the foreground window before
                         // the next action. A call is terminal: never run more actions after it.
                         val isCallStep = actionCommandRouter.requiresCallPermission(step) ||
-                            step.trim().lowercase().startsWith("whatsapp ")
+                            actionCommandRouter.isWhatsAppCallCommand(step)
                         if (isCallStep) break
                         if (index < multiSteps.lastIndex) {
-                            val opensApp = step.trim().lowercase().let {
-                                it.startsWith("open ") || it.startsWith("kholo ") || it.startsWith("launch ")
+                            val expectedPackage = actionCommandRouter.expectedForegroundPackageForOpenCommand(step)
+                            if (expectedPackage != null) {
+                                // Do not run the next step just because a fixed delay elapsed.
+                                // Wait for Accessibility to confirm the requested app is foreground.
+                                var foregroundVerified = false
+                                repeat(20) {
+                                    delay(250L)
+                                    val actualPackage = AngelAccessibilityService.currentForegroundPackage()
+                                    if (actualPackage == expectedPackage) {
+                                        foregroundVerified = true
+                                        return@repeat
+                                    }
+                                }
+                                if (!foregroundVerified) {
+                                    completedSteps.add(
+                                        "Step ${index + 1}: App foreground verify nahi hua; safety ke liye agla action rok diya."
+                                    )
+                                    break
+                                }
+                            } else {
+                                delay(700L)
                             }
-                            delay(if (opensApp) 1800L else 700L)
                         }
                     }
                     val response = completedSteps.joinToString("\n")
