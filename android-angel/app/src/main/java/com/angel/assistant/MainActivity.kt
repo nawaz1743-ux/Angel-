@@ -152,6 +152,26 @@ class MainActivity : ComponentActivity() {
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) return
 
+            // Recognized device commands run locally; ordinary conversation still goes to Gemini.
+            val actionResult = ActionCommandRouter(this@MainActivity).handle(userText)
+            if (actionResult != null) {
+                messages.add(
+                    ChatMessage(
+                        text = userText,
+                        isFromUser = true
+                    )
+                )
+                messages.add(
+                    ChatMessage(
+                        text = actionResult,
+                        isFromUser = false,
+                        provider = "Angel Action System"
+                    )
+                )
+                voiceManager.speak(actionResult, currentLanguage)
+                return
+            }
+
             messages.add(
                 ChatMessage(
                     text = userText,
