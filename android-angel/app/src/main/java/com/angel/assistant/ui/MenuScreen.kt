@@ -58,6 +58,7 @@ fun MenuScreen(
     onBack: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenApprovals: () -> Unit,
+    onOpenSmartAds: () -> Unit,
     onOpenSettings: () -> Unit,
     onInspectScreen: () -> Unit
 ) {
@@ -121,6 +122,12 @@ fun MenuScreen(
             "Voice aur animation settings",
             Icons.Default.VolumeUp,
             onOpenSettings
+        ),
+        AngelMenuItem(
+            "Smart Ads Manager",
+            "Google Ads aur Facebook/Instagram Ads ke plans, drafts aur analysis",
+            Icons.Default.Campaign,
+            onOpenSmartAds
         ),
         AngelMenuItem(
             "Ads Approvals",
