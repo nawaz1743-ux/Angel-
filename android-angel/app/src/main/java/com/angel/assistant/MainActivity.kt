@@ -70,6 +70,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val callPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        Toast.makeText(
+            this,
+            if (granted) {
+                "Phone permission granted. Repeat your call command."
+            } else {
+                "Phone permission denied. Angel will not place calls directly."
+            },
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
     private val contactsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -166,6 +180,22 @@ class MainActivity : ComponentActivity() {
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) return
+
+            // Direct calls are made only for an explicit call command. Android permission is required.
+            if (
+                actionCommandRouter.requiresCallPermission(userText) &&
+                ContextCompat.checkSelfPermission(
+                    this@MainActivity,
+                    Manifest.permission.CALL_PHONE
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                val permissionMessage = "Sir, phone call start karne ke liye Phone permission chahiye. Allow karein, phir call command dobara boliye."
+                messages.add(ChatMessage(text = userText, isFromUser = true))
+                messages.add(ChatMessage(text = permissionMessage, isFromUser = false, provider = "Angel Action System"))
+                voiceManager.speak(permissionMessage, currentLanguage)
+                callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                return
+            }
 
             // Ask for Contacts permission only when a contact-call command needs it.
             if (
