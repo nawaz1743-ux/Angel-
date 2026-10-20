@@ -227,7 +227,8 @@ class VoiceManager(
             pendingUtterances = chunks.size
             onSpeakingStateChanged(true)
 
-            chunks.forEachIndexed { index, chunk ->
+            for (index in chunks.indices) {
+                val chunk = chunks[index]
                 val chunkId = "${utteranceId}#${index}"
                 val params = Bundle().apply {
                     putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, chunkId)
