@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
 import com.angel.assistant.service.AngelAccessibilityService
@@ -93,17 +95,22 @@ class ActionCommandRouter(private val context: Context) {
             )
         }
 
-        val whatsappCall = Regex("""(?i)^(?:whatsapp|whats app)\s+(?:voice call|video call|call)\s+(?:to\s+)?(\+?[0-9][0-9 ()-]{6,})$""")
+        val whatsappCall = Regex("""(?i)^(?:whatsapp|whats app)\s+(?:(voice|video)\s+)?call\s+(?:to\s+)?(\+?[0-9][0-9 ()-]{6,})$""")
             .find(command)
         if (whatsappCall != null) {
-            val digits = whatsappCall.groupValues[1].filter { it.isDigit() }
+            val callType = whatsappCall.groupValues[1].lowercase()
+            val digits = whatsappCall.groupValues[2].filter { it.isDigit() }
             if (digits.length < 8) return "Sir, country code ke saath WhatsApp contact number boliye."
             return try {
                 context.startActivity(
                     Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
-                "WhatsApp contact khol diya. Wahan contact check karke Voice Call ya Video Call button aap dabaiye; Angel call khud start nahi karegi."
+                val video = callType == "video"
+                Handler(Looper.getMainLooper()).postDelayed({
+                    AngelAccessibilityService.clickWhatsAppCallButton(video)
+                }, 2200L)
+                "WhatsApp contact khol rahi hoon. Agar sahi contact ki visible ${if (video) "Video Call" else "Voice Call"} button mil gayi, Angel call start karne ki koshish karegi."
             } catch (_: Exception) {
                 "WhatsApp contact open nahi ho paya."
             }
