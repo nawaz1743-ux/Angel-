@@ -239,7 +239,7 @@ class ActionCommandRouter(private val context: Context) {
 
         if (matches.isEmpty()) return "Sir, '$name' naam ka contact nahi mila."
         if (matches.size > 1) {
-            val choices = matches.take(5).joinToString("\\n") { "${it.first}: ${it.second}" }
+            val choices = matches.take(5).joinToString("\n") { it.first + ": " + it.second }
             return "Sir, ek se zyada contacts mile. Kaunsa contact chahiye?\\n$choices"
         }
         val (contactName, number) = matches.first()
