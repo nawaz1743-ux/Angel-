@@ -97,12 +97,19 @@ class AngelAccessibilityService : AccessibilityService() {
          * Sends only after a separate user confirmation, only when a pending WhatsApp
          * draft exists in the caller, and only while the foreground package is WhatsApp.
          */
-        fun clickWhatsAppSendButton(): Boolean {
+        fun clickWhatsAppSendButton(expectedMessage: String): Boolean {
             val service = activeServiceInstance ?: return false
             val root = service.rootInActiveWindow ?: return false
             val packageName = root.packageName?.toString().orEmpty()
             if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return false
-            if (isSensitiveFinanceScreen(service)) return false
+            if (isSensitiveFinanceScreen(service) || expectedMessage.isBlank()) return false
+
+            // Require the current WhatsApp composer to contain the exact pending draft.
+            val focusedInput = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
+            if (!focusedInput.isEditable ||
+                focusedInput.text?.toString()?.trim() != expectedMessage.trim()
+            ) return false
+
             val sendNode = findExactTextNode(root, setOf("send", "send message"))
                 ?: return false
             var clickable: AccessibilityNodeInfo? = sendNode
