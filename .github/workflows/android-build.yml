@@ -46,3 +46,23 @@ jobs:
           path: android-angel/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
+
+  cloud-tests:
+    name: Test Angel Ads Cloud API
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ads-cloud
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ads-cloud/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run cloud API tests
+        run: python -m pytest -q
