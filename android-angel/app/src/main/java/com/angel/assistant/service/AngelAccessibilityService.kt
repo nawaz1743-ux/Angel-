@@ -82,6 +82,40 @@ class AngelAccessibilityService : AccessibilityService() {
         }
 
         /**
+         * Sends only after a separate user confirmation, only when a pending WhatsApp
+         * draft exists in the caller, and only while the foreground package is WhatsApp.
+         */
+        fun clickWhatsAppSendButton(): Boolean {
+            val service = activeServiceInstance ?: return false
+            val root = service.rootInActiveWindow ?: return false
+            val packageName = root.packageName?.toString().orEmpty()
+            if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return false
+            if (isSensitiveFinanceScreen(service)) return false
+            val sendNode = findExactTextNode(root, setOf("send", "send message"))
+                ?: return false
+            var clickable: AccessibilityNodeInfo? = sendNode
+            while (clickable != null && !clickable.isClickable) {
+                clickable = clickable.parent
+            }
+            return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+        }
+
+        private fun findExactTextNode(
+            node: AccessibilityNodeInfo?,
+            targets: Set<String>
+        ): AccessibilityNodeInfo? {
+            if (node == null) return null
+            val text = node.text?.toString()?.trim()?.lowercase().orEmpty()
+            val description = node.contentDescription?.toString()?.trim()?.lowercase().orEmpty()
+            if (text in targets || description in targets) return node
+            for (i in 0 until node.childCount) {
+                val found = findExactTextNode(node.getChild(i), targets)
+                if (found != null) return found
+            }
+            return null
+        }
+
+        /**
          * Writes text only into the currently focused editable field. It never submits
          * a form or presses Send; the user must separately confirm sending.
          */
