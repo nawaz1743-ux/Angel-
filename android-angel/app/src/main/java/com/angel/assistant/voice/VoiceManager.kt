@@ -82,16 +82,25 @@ class VoiceManager(
                     object : UtteranceProgressListener() {
 
                         override fun onStart(utteranceId: String?) {
-                            onSpeakingStateChanged(true)
+                            // Ignore callbacks from speech that was replaced by a newer response.
+                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                                onSpeakingStateChanged(true)
+                            }
                         }
 
                         override fun onDone(utteranceId: String?) {
-                            onSpeakingStateChanged(false)
+                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                                currentUtteranceId = null
+                                onSpeakingStateChanged(false)
+                            }
                         }
 
                         @Deprecated("Deprecated in Java")
                         override fun onError(utteranceId: String?) {
-                            onSpeakingStateChanged(false)
+                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                                currentUtteranceId = null
+                                onSpeakingStateChanged(false)
+                            }
                         }
 
                         override fun onError(
@@ -102,7 +111,10 @@ class VoiceManager(
                                 TAG,
                                 "TTS error for $utteranceId: $errorCode"
                             )
-                            onSpeakingStateChanged(false)
+                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                                currentUtteranceId = null
+                                onSpeakingStateChanged(false)
+                            }
                         }
                     }
                 )
@@ -180,13 +192,9 @@ class VoiceManager(
         }
 
         try {
-            val locale = if (
-                language == AssistantLanguage.HINGLISH
-            ) {
-                Locale("hi", "IN")
-            } else {
-                Locale("en", "IN")
-            }
+            // Roman Hinglish is written in Latin script. en-IN generally handles
+            // mixed English/Roman-Hindi text more consistently than a Hindi Devanagari voice.
+            val locale = Locale("en", "IN")
 
             val languageResult = tts.setLanguage(locale)
 
@@ -361,13 +369,24 @@ class VoiceManager(
             else -> "$hourWords bajkar $minute minute"
         }
 
-        val dayPart = if (period == "AM") {
-            "subah"
-        } else {
-            "shaam"
+        val dayPart = when {
+            period == "AM" && hour == 12 -> "raat"
+            period == "AM" -> "subah"
+            hour == 12 -> "dopahar"
+            hour in 1..4 -> "dopahar"
+            else -> "shaam"
         }
 
-        return "$dayPart $timeWords"
+        val normalizedHourWords = if (hour == 12) "baarah" else hourWords
+        val normalizedTimeWords = when (minute) {
+            0 -> "$normalizedHourWords baje"
+            15 -> "$normalizedHourWords bajkar pandrah minute"
+            30 -> "$normalizedHourWords bajkar tees minute"
+            45 -> "$normalizedHourWords bajkar paintaalis minute"
+            else -> "$normalizedHourWords bajkar $minute minute"
+        }
+
+        return "$dayPart $normalizedTimeWords"
     }
 
     private fun englishTime(
