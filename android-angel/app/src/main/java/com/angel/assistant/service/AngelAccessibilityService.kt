@@ -31,7 +31,12 @@ class AngelAccessibilityService : AccessibilityService() {
             "approve collect", "confirm transfer", "transfer amount", "pay now",
             "scan and pay", "scan to pay", "secure payment", "payment details",
             "net banking", "debit account", "credit account", "beneficiary account",
-            "card number", "cvv", "bank account number", "confirm payment"
+            "card number", "cvv", "bank account number", "confirm payment",
+            "payment successful", "payment pending", "transaction successful",
+            "transaction pending", "enter amount", "paying to", "collect money",
+            "approve payment", "upi id", "beneficiary", "add bank account",
+            "debit card", "credit card", "withdraw money", "withdrawal",
+            "fund transfer", "money transfer", "scan qr", "scan qr code"
         )
 
         private val sensitivePackageHints = listOf(
@@ -82,6 +87,19 @@ class AngelAccessibilityService : AccessibilityService() {
          * Reads visible text only when explicitly requested and not on a recognized
          * banking/UPI screen. This is a best-effort safety filter, not a security boundary.
          */
+        /** Current foreground package exposed by the accessibility window, if available. */
+        fun currentForegroundPackage(): String? {
+            val service = activeServiceInstance ?: return null
+            val root = service.rootInActiveWindow ?: return null
+            return root.packageName?.toString()?.lowercase()?.takeIf { it.isNotBlank() }
+        }
+
+        /** True when current window belongs to a recognized sensitive finance app/screen. */
+        fun isCurrentScreenBlockedForFinance(): Boolean {
+            val service = activeServiceInstance ?: return true
+            return isSensitiveFinanceScreen(service)
+        }
+
         fun captureVisibleScreenText(): String {
             val service = activeServiceInstance
                 ?: return "Accessibility Service is not enabled by user."
