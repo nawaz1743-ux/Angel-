@@ -1,11 +1,15 @@
 package com.angel.assistant.service
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
+import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
+/**
+ * User-enabled, foreground-only interaction foundation for Angel.
+ * Sensitive finance apps are excluded from both screen reading and actions.
+ */
 class AngelAccessibilityService : AccessibilityService() {
 
     companion object {
@@ -14,19 +18,121 @@ class AngelAccessibilityService : AccessibilityService() {
 
         private var activeServiceInstance: AngelAccessibilityService? = null
 
-        /**
-         * Safely inspects visible text on the active foreground window.
-         * Only returns data if the service is running and user requested screen assistance.
-         */
-        fun captureVisibleScreenText(): String {
-            val service = activeServiceInstance ?: return "Accessibility Service is not enabled by user."
-            val rootNode = service.rootInActiveWindow ?: return "No active window content accessible."
-            val builder = StringBuilder()
-            extractNodeTextRecursive(rootNode, builder, 0)
-            return if (builder.isBlank()) "No readable text detected on screen." else builder.toString()
+        private val sensitivePackageHints = listOf(
+            "bank", "banking", "upi", "paytm", "phonepe", "phonpe",
+            "google.android.apps.nbu.paisa", "gpay", "tez", "bhim",
+            "cred", "mobikwik", "amazonpay", "payzapp", "yono"
+        )
+
+        private fun isSensitiveFinanceScreen(service: AngelAccessibilityService): Boolean {
+            val packageName = service.rootInActiveWindow?.packageName
+                ?.toString()?.lowercase().orEmpty()
+            return packageName.isNotBlank() &&
+                sensitivePackageHints.any { hint -> packageName.contains(hint) }
         }
 
-        private fun extractNodeTextRecursive(node: AccessibilityNodeInfo?, out: StringBuilder, depth: Int) {
+        /**
+         * Reads visible text only when explicitly requested and not on a recognized
+         * banking/UPI screen. This is a best-effort safety filter, not a security boundary.
+         */
+        fun captureVisibleScreenText(): String {
+            val service = activeServiceInstance
+                ?: return "Accessibility Service is not enabled by user."
+            if (isSensitiveFinanceScreen(service)) {
+                return "Screen reading paused for a banking or payment app."
+            }
+            val rootNode = service.rootInActiveWindow
+                ?: return "No active window content accessible."
+            val builder = StringBuilder()
+            extractNodeTextRecursive(rootNode, builder, 0)
+            return if (builder.isBlank()) {
+                "No readable text detected on screen."
+            } else {
+                builder.toString()
+            }
+        }
+
+        /** Scrolls the current app's first available scrollable container. */
+        fun scroll(forward: Boolean = true): Boolean {
+            val service = activeServiceInstance ?: return false
+            if (isSensitiveFinanceScreen(service)) return false
+            val root = service.rootInActiveWindow ?: return false
+            return findScrollableNode(root)?.let { node ->
+                val action = if (forward) {
+                    AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                } else {
+                    AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                }
+                node.performAction(action)
+            } ?: false
+        }
+
+        /** Clicks a visible node whose text or content description matches the user's target. */
+        fun clickVisibleTarget(target: String): Boolean {
+            val service = activeServiceInstance ?: return false
+            if (target.isBlank() || isSensitiveFinanceScreen(service)) return false
+            val root = service.rootInActiveWindow ?: return false
+            return findMatchingNode(root, target.trim().lowercase())?.let { node ->
+                var clickable: AccessibilityNodeInfo? = node
+                while (clickable != null && !clickable.isClickable) {
+                    clickable = clickable.parent
+                }
+                clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+            } ?: false
+        }
+
+        /**
+         * Writes text only into the currently focused editable field. It never submits
+         * a form or presses Send; the user must separately confirm sending.
+         */
+        fun typeIntoFocusedField(text: String): Boolean {
+            val service = activeServiceInstance ?: return false
+            if (text.isEmpty() || isSensitiveFinanceScreen(service)) return false
+            val root = service.rootInActiveWindow ?: return false
+            val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
+            if (!focused.isEditable) return false
+            val args = Bundle().apply {
+                putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    text
+                )
+            }
+            return focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        }
+
+        private fun findScrollableNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+            if (node == null) return null
+            if (node.isScrollable) return node
+            for (i in 0 until node.childCount) {
+                val found = findScrollableNode(node.getChild(i))
+                if (found != null) return found
+            }
+            return null
+        }
+
+        private fun findMatchingNode(
+            node: AccessibilityNodeInfo?,
+            target: String
+        ): AccessibilityNodeInfo? {
+            if (node == null) return null
+            val text = node.text?.toString()?.lowercase().orEmpty()
+            val description = node.contentDescription?.toString()?.lowercase().orEmpty()
+            if (text == target || description == target ||
+                (target.length >= 3 && (text.contains(target) || description.contains(target)))
+            ) return node
+
+            for (i in 0 until node.childCount) {
+                val found = findMatchingNode(node.getChild(i), target)
+                if (found != null) return found
+            }
+            return null
+        }
+
+        private fun extractNodeTextRecursive(
+            node: AccessibilityNodeInfo?,
+            out: StringBuilder,
+            depth: Int
+        ) {
             if (node == null || depth > 10) return
             val text = node.text?.toString()?.trim()
             val contentDesc = node.contentDescription?.toString()?.trim()
@@ -45,12 +151,11 @@ class AngelAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         isServiceRunning = true
         activeServiceInstance = this
-        Log.i("AngelAccessibility", "Angel Screen Understanding Accessibility Service connected.")
+        Log.i("AngelAccessibility", "Angel foreground interaction foundation connected.")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Passive observation only; no unsolicited or hidden gestures are executed.
-        // User retains full manual control of their device at all times.
+        // No automatic actions are triggered by screen events.
     }
 
     override fun onInterrupt() {
@@ -58,9 +163,9 @@ class AngelAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         isServiceRunning = false
-        activeServiceInstance = null
+        if (activeServiceInstance === this) activeServiceInstance = null
+        super.onDestroy()
         Log.i("AngelAccessibility", "Angel Accessibility Service destroyed.")
     }
 }
