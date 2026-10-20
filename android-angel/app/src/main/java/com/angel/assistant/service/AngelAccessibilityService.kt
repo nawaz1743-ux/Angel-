@@ -84,13 +84,17 @@ class AngelAccessibilityService : AccessibilityService() {
             )
             if (blockedTarget.containsMatchIn(target)) return false
             val root = service.rootInActiveWindow ?: return false
-            return findMatchingNode(root, target.trim().lowercase())?.let { node ->
-                var clickable: AccessibilityNodeInfo? = node
-                while (clickable != null && !clickable.isClickable) {
-                    clickable = clickable.parent
-                }
-                clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
-            } ?: false
+            // Prefer an exact label match before considering a partial match. This
+            // reduces accidental clicks when several controls contain similar wording.
+            val normalizedTarget = target.trim().lowercase()
+            val node = findExactMatchingNode(root, normalizedTarget)
+                ?: findMatchingNode(root, normalizedTarget)
+                ?: return false
+            var clickable: AccessibilityNodeInfo? = node
+            while (clickable != null && !clickable.isClickable) {
+                clickable = clickable.parent
+            }
+            return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
         }
 
         /**
@@ -228,10 +232,32 @@ class AngelAccessibilityService : AccessibilityService() {
         }
 
         private fun findScrollableNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-            if (node == null) return null
+            if (node == null || !node.isVisibleToUser) return null
+            // Prefer the focused scroll area when an app exposes one, then the first
+            // visible scrollable container. Never issue a coordinate-based gesture.
+            if (node.isScrollable && node.isFocused) return node
+            for (i in 0 until node.childCount) {
+                val found = findScrollableNode(node.getChild(i))
+                if (found != null && found.isFocused) return found
+            }
             if (node.isScrollable) return node
             for (i in 0 until node.childCount) {
                 val found = findScrollableNode(node.getChild(i))
+                if (found != null) return found
+            }
+            return null
+        }
+
+        private fun findExactMatchingNode(
+            node: AccessibilityNodeInfo?,
+            target: String
+        ): AccessibilityNodeInfo? {
+            if (node == null || !node.isVisibleToUser) return null
+            val text = node.text?.toString()?.trim()?.lowercase().orEmpty()
+            val description = node.contentDescription?.toString()?.trim()?.lowercase().orEmpty()
+            if (text == target || description == target) return node
+            for (i in 0 until node.childCount) {
+                val found = findExactMatchingNode(node.getChild(i), target)
                 if (found != null) return found
             }
             return null
