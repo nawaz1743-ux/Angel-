@@ -242,12 +242,12 @@ class MainActivity : ComponentActivity() {
                                 // Do not run the next step just because a fixed delay elapsed.
                                 // Wait for Accessibility to confirm the requested app is foreground.
                                 var foregroundVerified = false
-                                repeat(20) {
+                                for (attempt in 0 until 20) {
                                     delay(250L)
                                     val actualPackage = AngelAccessibilityService.currentForegroundPackage()
                                     if (actualPackage == expectedPackage) {
                                         foregroundVerified = true
-                                        return@repeat
+                                        break
                                     }
                                 }
                                 if (!foregroundVerified) {
