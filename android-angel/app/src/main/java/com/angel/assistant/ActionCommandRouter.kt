@@ -78,7 +78,7 @@ class ActionCommandRouter(private val context: Context) {
             )
         }
 
-        val whatsappCall = Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:voice call|video call|call)\\s+(?:to\\s+)?(\\+?[0-9][0-9 ()-]{6,})$""")
+        val whatsappCall = Regex("""(?i)^(?:whatsapp|whats app)\s+(?:voice call|video call|call)\s+(?:to\s+)?(\+?[0-9][0-9 ()-]{6,})$""")
             .find(command)
         if (whatsappCall != null) {
             val digits = whatsappCall.groupValues[1].filter { it.isDigit() }
