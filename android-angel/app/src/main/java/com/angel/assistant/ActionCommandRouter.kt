@@ -33,6 +33,35 @@ class ActionCommandRouter(private val context: Context) {
             Regex("""(?i)^call\s+number\s+\+?[0-9][0-9 ()-]{5,}$""").matches(command)
     }
 
+    /**
+     * Splits only explicit sequencing phrases. We intentionally do not split plain "and/aur",
+     * because those words can be part of a message draft or a contact/app name.
+     */
+    fun parseMultiStepCommand(rawCommand: String): List<String>? {
+        val parts = rawCommand.trim().split(
+            Regex("""(?i)\s+(?:and\s+then|then|phir|aur\s+phir|uske\s+baad)\s+|\s*;\s*""")
+        ).map { it.trim().trimEnd('.', ',') }.filter { it.isNotBlank() }
+        if (parts.size < 2 || parts.size > 6) return null
+
+        // Only sequence steps that this local action router can safely execute.
+        val allowed = parts.all { step ->
+            val n = step.lowercase()
+            n.startsWith("open ") || n.startsWith("kholo ") || n.startsWith("launch ") ||
+                n.startsWith("tap ") || n.startsWith("click ") || n.startsWith("press ") ||
+                n.startsWith("button par tap karo ") || n.startsWith("button dabao ") ||
+                n.startsWith("type ") || n.startsWith("enter text ") ||
+                n.startsWith("text likho ") || n.startsWith("likho ") ||
+                n in listOf("scroll down", "neeche scroll karo", "neeche scroll",
+                    "scroll up", "upar scroll karo", "upar scroll",
+                    "read screen", "screen padho", "screen padh kar sunao",
+                    "what is on my screen", "hang up", "end call", "call drop karo",
+                    "call kaat do", "phone kaat do", "disconnect call") ||
+                requiresCallPermission(step) || n.startsWith("dial ") ||
+                n.startsWith("number dial karo ")
+        }
+        return if (allowed) parts else null
+    }
+
     fun handle(rawCommand: String): String? {
         val command = rawCommand.trim()
         val normalized = command.lowercase()
