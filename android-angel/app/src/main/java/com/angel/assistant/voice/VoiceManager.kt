@@ -63,9 +63,20 @@ class VoiceManager(
                     Log.w(TAG, "English India voice is unavailable")
                 }
 
-                // Slightly slower speech can sound more conversational.
+                // Prefer the best-quality installed English-India voice available
+                // on this device. The actual voice catalog depends on Android TTS.
+                val preferredVoice = tts.voices
+                    ?.filter { it.locale.language == "en" && it.locale.country == "IN" }
+                    ?.maxByOrNull { it.quality }
+
+                if (preferredVoice != null) {
+                    tts.voice = preferredVoice
+                    Log.d(TAG, "Selected TTS voice: ${preferredVoice.name}, quality=${preferredVoice.quality}")
+                }
+
+                // A slightly slower rate and neutral pitch sound less rushed.
                 tts.setSpeechRate(NATURAL_SPEECH_RATE)
-                tts.setPitch(NATURAL_PITCH)
+                tts.setPitch(1.0f)
 
                 tts.setOnUtteranceProgressListener(
                     object : UtteranceProgressListener() {
@@ -255,19 +266,22 @@ class VoiceManager(
             " "
         )
 
-        // Remove common Markdown heading, emphasis and quote markers.
-        result = result.replace(
-            Regex("(?m)^\\s{0,3}#{1,6}\\s*"),
-            ""
-        )
-        result = result.replace(
-            Regex("(?m)^\\s*>+\\s?"),
-            ""
-        )
-        result = result.replace(
-            Regex("[*_`~]+"),
-            ""
-        )
+        // Strip Markdown syntax even when the model places markers inline.
+        // Headings are spoken as ordinary sentences, never as "hash" symbols.
+        result = result.replace(Regex("(?m)^\\\\s{0,3}#{1,6}\\\\s*"), "")
+        result = result.replace(Regex("(?m)^\\\\s*>+\\\\s?"), "")
+        result = result.replace(Regex("(?m)^\\\\s*[-*_]{3,}\\\\s*$"), "")
+        result = result.replace(Regex("\\\\*\\\\*(.*?)\\\\*\\\\*"), "$1")
+        result = result.replace(Regex("__(.*?)__"), "$1")
+        result = result.replace(Regex("(?<!\\\\*)\\\\*(?!\\\\*)(.*?)\\\\*(?!\\\\*)"), "$1")
+        result = result.replace(Regex("(?<!_)_(?!_)(.*?)_(?!_)"), "$1")
+        result = result.replace(Regex("[\\\\x60~]+"), "")
+        result = result.replace(Regex("#{1,6}"), "")
+        result = result.replace(Regex("[|]+"), " ")
+        result = result.replace(Regex("(?m)^\\\\s*[-+•]\\\\s*"), "")
+        result = result.replace(Regex("(?m)^\\\\s*\\\\d+[.)]\\\\s+"), "")
+        result = result.replace(Regex("[ \\t]*([.!?])"), "$1")
+
 
         // Remove Markdown table separators and list markers.
         result = result.replace(
@@ -417,10 +431,3 @@ class VoiceManager(
             textToSpeech?.stop()
             textToSpeech?.shutdown()
             textToSpeech = null
-
-            onSpeakingStateChanged(false)
-        } catch (e: Exception) {
-            Log.e(TAG, "destroy error: ${e.message}", e)
-        }
-    }
-}
