@@ -266,22 +266,31 @@ class VoiceManager(
             " "
         )
 
-        // Strip Markdown syntax even when the model places markers inline.
-        // Headings are spoken as ordinary sentences, never as "hash" symbols.
-        result = result.replace(Regex("(?m)^\\\\s{0,3}#{1,6}\\\\s*"), "")
-        result = result.replace(Regex("(?m)^\\\\s*>+\\\\s?"), "")
-        result = result.replace(Regex("(?m)^\\\\s*[-*_]{3,}\\\\s*$"), "")
-        result = result.replace(Regex("\\\\*\\\\*(.*?)\\\\*\\\\*"), "$1")
+        // Remove Markdown syntax before sending text to Android TTS.
+        // Convert headings to plain speech, including headings embedded mid-response.
+        result = result.replace(Regex("(?m)^\\s{0,3}#{1,6}\\s*"), "")
+        result = result.replace(Regex("(?m)^\\s*>+\\s?"), "")
+        result = result.replace(Regex("(?m)^\\s*[-*_]{3,}\\s*$"), "")
+        result = result.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
         result = result.replace(Regex("__(.*?)__"), "$1")
-        result = result.replace(Regex("(?<!\\\\*)\\\\*(?!\\\\*)(.*?)\\\\*(?!\\\\*)"), "$1")
+        result = result.replace(Regex("(?<!\\*)\\*(?!\\*)(.*?)\\*(?!\\*)"), "$1")
         result = result.replace(Regex("(?<!_)_(?!_)(.*?)_(?!_)"), "$1")
-        result = result.replace(Regex("[\\\\x60~]+"), "")
-        result = result.replace(Regex("#{1,6}"), "")
+        result = result.replace("\`", "")
+        result = result.replace("~", "")
+        result = result.replace(Regex("#{1,6}\\s*"), "")
         result = result.replace(Regex("[|]+"), " ")
-        result = result.replace(Regex("(?m)^\\\\s*[-+•]\\\\s*"), "")
-        result = result.replace(Regex("(?m)^\\\\s*\\\\d+[.)]\\\\s+"), "")
-        result = result.replace(Regex("[ \\t]*([.!?])"), "$1")
-
+        result = result.replace(
+            Regex("(?m)^\\s*[-+•]\\s*"),
+            ""
+        )
+        result = result.replace(
+            Regex("(?m)^\\s*\\d+[.)]\\s+"),
+            ""
+        )
+        result = result.replace(
+            Regex("[ \\t]*([.!?])"),
+            "$1"
+        )
 
         // Remove Markdown table separators and list markers.
         result = result.replace(
@@ -431,3 +440,5 @@ class VoiceManager(
             textToSpeech?.stop()
             textToSpeech?.shutdown()
             textToSpeech = null
+    }
+}
