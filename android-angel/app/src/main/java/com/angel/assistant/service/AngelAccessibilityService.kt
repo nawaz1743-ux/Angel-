@@ -106,6 +106,30 @@ class AngelAccessibilityService : AccessibilityService() {
             return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
         }
 
+        /** Ends an active call only through the visible call UI after a spoken command. */
+        fun clickEndCallButton(): Boolean {
+            val service = activeServiceInstance ?: return false
+            val root = service.rootInActiveWindow ?: return false
+            val packageName = root.packageName?.toString().orEmpty()
+            val allowedCallPackages = setOf(
+                "com.whatsapp",
+                "com.whatsapp.w4b",
+                "com.samsung.android.dialer",
+                "com.google.android.dialer",
+                "com.android.phone"
+            )
+            if (packageName !in allowedCallPackages || isSensitiveFinanceScreen(service)) return false
+            val endNode = findExactTextNode(
+                root,
+                setOf("end call", "hang up", "disconnect", "end voice call", "end video call")
+            ) ?: return false
+            var clickable: AccessibilityNodeInfo? = endNode
+            while (clickable != null && !clickable.isClickable) {
+                clickable = clickable.parent
+            }
+            return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+        }
+
         private fun findExactTextNode(
             node: AccessibilityNodeInfo?,
             targets: Set<String>
