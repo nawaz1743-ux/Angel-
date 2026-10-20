@@ -128,3 +128,26 @@ def test_campaign_analysis_rejects_conversions_greater_than_clicks(monkeypatch):
         "conversion_tracking_configured": True
     })
     assert response.status_code == 422
+
+
+def test_campaign_analysis_calculates_cost_per_call_when_tracking_is_configured(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    response = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key": "test-secret"}, json={
+        "provider": "google_ads", "account_ref": "demo", "impressions": 1000,
+        "clicks": 50, "spend": 250.0, "calls": 5,
+        "conversion_tracking_configured": True
+    })
+    assert response.status_code == 200
+    metrics = response.json()["analysis"]["metrics"]
+    assert metrics["calls"] == 5
+    assert metrics["cost_per_call"] == 50.0
+    assert response.json()["campaign_changed"] is False
+
+
+def test_campaign_analysis_rejects_calls_greater_than_clicks(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    response = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key": "test-secret"}, json={
+        "provider": "meta_ads", "account_ref": "demo", "impressions": 100,
+        "clicks": 10, "spend": 20.0, "calls": 11
+    })
+    assert response.status_code == 422
