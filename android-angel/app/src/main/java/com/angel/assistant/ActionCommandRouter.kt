@@ -26,6 +26,38 @@ class ActionCommandRouter(private val context: Context) {
     fun requiresContactLookup(rawCommand: String): Boolean =
         extractContactCallName(rawCommand) != null
 
+    /** Package expected after an explicit app-launch step; null means not a known shortcut. */
+    fun expectedForegroundPackageForOpenCommand(rawCommand: String): String? {
+        val command = rawCommand.trim()
+        val name = when {
+            command.startsWith("open ", true) -> command.substring(5).trim()
+            command.startsWith("kholo ", true) -> command.substring(6).trim()
+            command.startsWith("launch ", true) -> command.substring(7).trim()
+            else -> return null
+        }.lowercase()
+        return mapOf(
+            "whatsapp" to "com.whatsapp",
+            "whats app" to "com.whatsapp",
+            "chrome" to "com.android.chrome",
+            "google chrome" to "com.android.chrome",
+            "youtube" to "com.google.android.youtube",
+            "settings" to "com.android.settings",
+            "setting" to "com.android.settings",
+            "maps" to "com.google.android.apps.maps",
+            "google maps" to "com.google.android.apps.maps",
+            "gmail" to "com.google.android.gm",
+            "play store" to "com.android.vending",
+            "google ads" to "com.google.android.apps.adwords",
+            "camera" to "com.sec.android.app.camera",
+            "phone" to "com.samsung.android.dialer",
+            "dialer" to "com.samsung.android.dialer"
+        )[name]
+    }
+
+    fun isWhatsAppCallCommand(rawCommand: String): Boolean =
+        Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:(?:voice|video)\\s+)?call\\s+(?:to\\s+)?\\+?[0-9][0-9 ()-]{6,}$""")
+            .matches(rawCommand.trim())
+
     /** True only for explicit phone-call commands, not ordinary dialer preparation. */
     fun requiresCallPermission(rawCommand: String): Boolean {
         val command = rawCommand.trim()
