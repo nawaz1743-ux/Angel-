@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets
 class ActionCommandRouter(private val context: Context) {
 
     private var pendingWhatsAppDraft = false
+    private var pendingWhatsAppMessage: String? = null
 
     fun requiresContactLookup(rawCommand: String): Boolean =
         extractContactCallName(rawCommand) != null
@@ -131,6 +132,7 @@ class ActionCommandRouter(private val context: Context) {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
                 pendingWhatsAppDraft = true
+                pendingWhatsAppMessage = message
                 "WhatsApp mein message draft khol diya. Sir, message check karke jab aap 'send' kahenge tabhi Angel Send button dabane ki koshish karegi."
             } catch (_: Exception) {
                 "WhatsApp draft open nahi ho paya. WhatsApp installed hai aur number sahi hai, check karein."
@@ -141,9 +143,11 @@ class ActionCommandRouter(private val context: Context) {
             if (!pendingWhatsAppDraft) {
                 return "Sir, koi pending WhatsApp draft nahi hai. Pehle message draft karwa lijiye."
             }
-            val sent = AngelAccessibilityService.clickWhatsAppSendButton()
+            val expectedMessage = pendingWhatsAppMessage ?: return "Sir, pending message text available nahi hai. Draft dobara banaiye."
+            val sent = AngelAccessibilityService.clickWhatsAppSendButton(expectedMessage)
             if (sent) {
                 pendingWhatsAppDraft = false
+                pendingWhatsAppMessage = null
                 return "WhatsApp ka Send button dabaya gaya. Agar app ne message accept kiya hai to message chala gaya hoga."
             }
             return "Sir, WhatsApp ka Send button nahi dabaya. Confirm karein ki WhatsApp draft screen khuli hai; agar button nazar nahi aa raha to aap khud send karein."
