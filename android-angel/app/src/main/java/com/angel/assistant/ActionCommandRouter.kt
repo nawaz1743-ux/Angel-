@@ -186,7 +186,7 @@ class ActionCommandRouter(private val context: Context) {
     }
 
     private fun extractContactCallName(command: String): String? {
-        val hindiOrder = Regex("""(?i)^(.+?)\\s+ko\\s+(?:call|phone)\\s+karo$""").find(command.trim())
+        val hindiOrder = Regex("""(?i)^(.+?)\s+ko\s+(?:call|phone)\s+karo$""").find(command.trim())
         if (hindiOrder != null) {
             val contact = hindiOrder.groupValues[1].trim()
             if (contact.isNotBlank()) return contact
