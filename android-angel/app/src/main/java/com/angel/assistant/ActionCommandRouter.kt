@@ -55,7 +55,7 @@ class ActionCommandRouter(private val context: Context) {
     }
 
     fun isWhatsAppCallCommand(rawCommand: String): Boolean =
-        Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:(?:voice|video)\\s+)?call\\s+(?:to\\s+)?\\+?[0-9][0-9 ()-]{6,}$""")
+        Regex("""(?i)^(?:whatsapp|whats app)\s+(?:(?:voice|video)\s+)?call\s+(?:to\s+)?\+?[0-9][0-9 ()-]{6,}$""")
             .matches(rawCommand.trim())
 
     /** True only for explicit phone-call commands, not ordinary dialer preparation. */
