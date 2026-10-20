@@ -23,6 +23,7 @@ class VoiceManager(
     private var isTtsReady = false
 
     private var currentUtteranceId: String? = null
+    private var pendingUtterances: Int = 0
 
     companion object {
         private const val TAG = "VoiceManager"
@@ -83,22 +84,26 @@ class VoiceManager(
 
                         override fun onStart(utteranceId: String?) {
                             // Ignore callbacks from speech that was replaced by a newer response.
-                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                            if (isCurrentUtterance(utteranceId)) {
                                 onSpeakingStateChanged(true)
                             }
                         }
 
                         override fun onDone(utteranceId: String?) {
-                            if (utteranceId != null && utteranceId == currentUtteranceId) {
-                                currentUtteranceId = null
-                                onSpeakingStateChanged(false)
+                            if (isCurrentUtterance(utteranceId)) {
+                                pendingUtterances = (pendingUtterances - 1).coerceAtLeast(0)
+                                if (pendingUtterances == 0) {
+                                    currentUtteranceId = null
+                                    onSpeakingStateChanged(false)
+                                }
                             }
                         }
 
                         @Deprecated("Deprecated in Java")
                         override fun onError(utteranceId: String?) {
-                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                            if (isCurrentUtterance(utteranceId)) {
                                 currentUtteranceId = null
+                                pendingUtterances = 0
                                 onSpeakingStateChanged(false)
                             }
                         }
@@ -111,8 +116,9 @@ class VoiceManager(
                                 TAG,
                                 "TTS error for $utteranceId: $errorCode"
                             )
-                            if (utteranceId != null && utteranceId == currentUtteranceId) {
+                            if (isCurrentUtterance(utteranceId)) {
                                 currentUtteranceId = null
+                                pendingUtterances = 0
                                 onSpeakingStateChanged(false)
                             }
                         }
@@ -215,33 +221,55 @@ class VoiceManager(
             tts.setSpeechRate(NATURAL_SPEECH_RATE)
             tts.setPitch(NATURAL_PITCH)
 
-            val utteranceId =
-                "angel_${System.currentTimeMillis()}"
-
+            val utteranceId = "angel_${System.currentTimeMillis()}"
+            val chunks = splitForSpeech(cleanText)
             currentUtteranceId = utteranceId
+            pendingUtterances = chunks.size
+            onSpeakingStateChanged(true)
 
-            val params = Bundle().apply {
-                putString(
-                    TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
-                    utteranceId
-                )
-            }
-
-            val result = tts.speak(
-                cleanText,
-                TextToSpeech.QUEUE_FLUSH,
-                params,
-                utteranceId
-            )
-
-            if (result == TextToSpeech.ERROR) {
-                Log.e(TAG, "TTS could not start speaking")
-                onSpeakingStateChanged(false)
+            chunks.forEachIndexed { index, chunk ->
+                val chunkId = "${utteranceId}#${index}"
+                val params = Bundle().apply {
+                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, chunkId)
+                }
+                val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+                val result = tts.speak(chunk, queueMode, params, chunkId)
+                if (result == TextToSpeech.ERROR) {
+                    Log.e(TAG, "TTS could not queue speech chunk ${index + 1}")
+                    currentUtteranceId = null
+                    pendingUtterances = 0
+                    tts.stop()
+                    onSpeakingStateChanged(false)
+                    break
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Speech error: ${e.message}", e)
             onSpeakingStateChanged(false)
         }
+    }
+
+    private fun isCurrentUtterance(utteranceId: String?): Boolean {
+        val current = currentUtteranceId ?: return false
+        return utteranceId != null && utteranceId.startsWith("${current}#")
+    }
+
+    /** Split long answers at sentence/word boundaries to avoid TTS engine length limits. */
+    private fun splitForSpeech(text: String, maxChunkLength: Int = 1800): List<String> {
+        if (text.length <= maxChunkLength) return listOf(text)
+        val chunks = mutableListOf<String>()
+        var remaining = text.trim()
+        while (remaining.length > maxChunkLength) {
+            var splitAt = remaining.lastIndexOf(". ", maxChunkLength)
+            if (splitAt < maxChunkLength / 2) splitAt = remaining.lastIndexOf("! ", maxChunkLength)
+            if (splitAt < maxChunkLength / 2) splitAt = remaining.lastIndexOf("? ", maxChunkLength)
+            if (splitAt < maxChunkLength / 2) splitAt = remaining.lastIndexOf(' ', maxChunkLength)
+            if (splitAt < 1) splitAt = maxChunkLength
+            chunks.add(remaining.substring(0, splitAt).trim())
+            remaining = remaining.substring(splitAt).trim()
+        }
+        if (remaining.isNotBlank()) chunks.add(remaining)
+        return chunks.filter { it.isNotBlank() }
     }
 
     /**
