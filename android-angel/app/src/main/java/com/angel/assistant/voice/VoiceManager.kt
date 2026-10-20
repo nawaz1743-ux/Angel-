@@ -440,5 +440,8 @@ class VoiceManager(
             textToSpeech?.stop()
             textToSpeech?.shutdown()
             textToSpeech = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Destroy error: ${e.message}", e)
+        }
     }
 }
