@@ -81,6 +81,7 @@ class CampaignAnalysisRequest(BaseModel):
     clicks: StrictInt = Field(ge=0)
     spend: StrictFloat = Field(ge=0, le=100000000)
     conversions: StrictInt | None = Field(default=None, ge=0)
+    calls: StrictInt | None = Field(default=None, ge=0)
     conversion_tracking_configured: StrictBool = False
 
 class ApprovalRequest(BaseModel):
@@ -196,6 +197,8 @@ def analyze_campaign_metrics(
         raise HTTPException(status_code=422, detail="Clicks cannot exceed impressions.")
     if payload.conversions is not None and payload.conversions > payload.clicks:
         raise HTTPException(status_code=422, detail="Conversions cannot exceed clicks.")
+    if payload.calls is not None and payload.calls > payload.clicks:
+        raise HTTPException(status_code=422, detail="Calls cannot exceed clicks.")
     if not __import__("math").isfinite(payload.spend):
         raise HTTPException(status_code=422, detail="Spend must be finite.")
     metrics = {
@@ -203,6 +206,7 @@ def analyze_campaign_metrics(
         "clicks": payload.clicks,
         "spend": payload.spend,
         "conversions": payload.conversions,
+        "calls": payload.calls,
         "conversion_tracking_configured": payload.conversion_tracking_configured,
     }
     return {
