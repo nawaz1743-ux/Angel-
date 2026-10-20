@@ -367,6 +367,10 @@ class AngelAccessibilityService : AccessibilityService() {
             return
         }
         if (eventPackage == packageName.lowercase()) return
+        // Never carry one app's text into a different external app.
+        if (lastExternalPackage != null && lastExternalPackage != eventPackage) {
+            clearExternalSnapshot()
+        }
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString()?.lowercase() != eventPackage) return
         val builder = StringBuilder()
