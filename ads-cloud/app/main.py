@@ -15,6 +15,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .providers.registry import ProviderConfig, ProviderRegistry
+from .optimization import analyze_campaign
 
 
 def _configured(*names: str) -> bool:
@@ -167,3 +168,37 @@ def get_approval_draft(approval_id: str, x_angel_api_key: str | None = Header(de
         "created_at": row["created_at"],
         "live_change_applied": False,
     }
+
+
+@app.post("/v1/analysis/campaign")
+def analyze_campaign_metrics(payload: dict, x_angel_api_key: str | None = Header(default=None)) -> dict:
+    """Analyze caller-supplied normalized metrics; this endpoint never changes campaigns."""
+    _require_api_key(x_angel_api_key)
+    provider_key = payload.get("provider")
+    provider = build_registry().get(provider_key) if isinstance(provider_key, str) else None
+    if provider is None:
+        raise HTTPException(status_code=404, detail="Unsupported advertising platform.")
+    account_ref = payload.get("account_ref")
+    if not isinstance(account_ref, str) or not account_ref.strip() or len(account_ref) > 200:
+        raise HTTPException(status_code=422, detail="account_ref must be 1 to 200 characters.")
+    try:
+        impressions = int(payload.get("impressions", -1))
+        clicks = int(payload.get("clicks", -1))
+        spend = float(payload.get("spend", -1))
+        conversions = payload.get("conversions")
+        if impressions < 0 or clicks < 0 or spend < 0 or clicks > impressions:
+            raise ValueError()
+        if conversions is not None and (not isinstance(conversions, int) or conversions < 0 or conversions > clicks):
+            raise ValueError()
+        if not all(__import__("math").isfinite(v) for v in (spend,)):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise HTTPException(status_code=422, detail="Metrics must be non-negative and internally consistent.")
+    if payload.get("conversion_tracking_configured", False) not in (True, False):
+        raise HTTPException(status_code=422, detail="conversion_tracking_configured must be boolean.")
+    metrics = {"impressions": impressions, "clicks": clicks, "spend": spend,
+               "conversions": conversions,
+               "conversion_tracking_configured": payload.get("conversion_tracking_configured", False)}
+    return {"provider": provider.key, "account_ref": account_ref, "analysis": analyze_campaign(metrics),
+            "source": "user_supplied_metrics", "live_provider_data_fetched": False,
+            "campaign_changed": False, "approval_required_for_any_live_change": True}
