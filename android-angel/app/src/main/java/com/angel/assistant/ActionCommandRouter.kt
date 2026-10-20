@@ -59,7 +59,7 @@ class ActionCommandRouter(private val context: Context) {
                 requiresCallPermission(step) || n.startsWith("dial ") ||
                 n.startsWith("number dial karo ") ||
                 parseWhatsAppDraft(step) != null ||
-                Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:(?:voice|video)\\s+)?call\\s+(?:to\\s+)?\\+?[0-9][0-9 ()-]{6,}$""").matches(step)
+                Regex("""(?i)^(?:whatsapp|whats app)\s+(?:(?:voice|video)\s+)?call\s+(?:to\s+)?\\+?[0-9][0-9 ()-]{6,}$""").matches(step)
         }
         if (!allowed) return null
 
@@ -67,7 +67,7 @@ class ActionCommandRouter(private val context: Context) {
         // on the live-call UI. Sending a message also remains a separate confirmation.
         val callIndexes = parts.indices.filter { index ->
             requiresCallPermission(parts[index]) ||
-                Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:(?:voice|video)\\s+)?call\\s+(?:to\\s+)?\\+?[0-9][0-9 ()-]{6,}$""").matches(parts[index])
+                Regex("""(?i)^(?:whatsapp|whats app)\s+(?:(?:voice|video)\s+)?call\s+(?:to\s+)?\\+?[0-9][0-9 ()-]{6,}$""").matches(parts[index])
         }
         if (callIndexes.any { it != parts.lastIndex }) return null
         if (parts.any { it.trim().lowercase() in listOf("send", "send it", "send karo", "bhej do", "confirm send") }) return null
@@ -273,7 +273,7 @@ class ActionCommandRouter(private val context: Context) {
         val prefixes = listOf("call contact ", "dial contact ", "call karo ", "phone karo ", "call ")
         val prefix = prefixes.firstOrNull { command.startsWith(it, ignoreCase = true) } ?: return null
         val name = command.substring(prefix.length).trim()
-            .replace(Regex("(?i)\\s+(ko call karo|ko phone karo|ko call|ko)$"), "")
+            .replace(Regex("(?i)\s+(ko call karo|ko phone karo|ko call|ko)$"), "")
             .trim()
         if (name.isBlank() || name.matches(Regex("[+0-9 ()-]+")) ||
             name.startsWith("number ", ignoreCase = true) ||
