@@ -79,7 +79,7 @@ class AngelAccessibilityService : AccessibilityService() {
             if (target.isBlank() || isSensitiveFinanceScreen(service)) return false
             // Never let a generic voice tap target payment/transfer controls.
             val blockedTarget = Regex(
-                """\\b(pay|payment|upi|transfer money|send money|bank transfer|confirm payment|approve payment)\\b""",
+                """\b(pay|payment|upi|transfer money|send money|bank transfer|confirm payment|approve payment)\b""",
                 RegexOption.IGNORE_CASE
             )
             if (blockedTarget.containsMatchIn(target)) return false
