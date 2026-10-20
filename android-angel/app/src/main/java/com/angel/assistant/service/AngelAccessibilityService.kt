@@ -119,6 +119,29 @@ class AngelAccessibilityService : AccessibilityService() {
             return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
         }
 
+        /**
+         * Starts a WhatsApp call only by clicking an exact, visible call control in WhatsApp.
+         * It never clicks a generic screen coordinate or a button in another app.
+         */
+        fun clickWhatsAppCallButton(video: Boolean): Boolean {
+            val service = activeServiceInstance ?: return false
+            val root = service.rootInActiveWindow ?: return false
+            val packageName = root.packageName?.toString().orEmpty()
+            if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return false
+            if (isSensitiveFinanceScreen(service)) return false
+            val targets = if (video) {
+                setOf("video call", "start video call", "video call button")
+            } else {
+                setOf("voice call", "start voice call", "voice call button")
+            }
+            val callNode = findExactTextNode(root, targets) ?: return false
+            var clickable: AccessibilityNodeInfo? = callNode
+            while (clickable != null && !clickable.isClickable) {
+                clickable = clickable.parent
+            }
+            return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+        }
+
         /** Ends an active call only through the visible call UI after a spoken command. */
         fun clickEndCallButton(): Boolean {
             val service = activeServiceInstance ?: return false
