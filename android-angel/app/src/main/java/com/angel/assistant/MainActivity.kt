@@ -41,6 +41,7 @@ enum class Screen {
     MENU,
     CHAT,
     APPROVALS,
+    SMART_ADS,
     SETTINGS
 }
 
@@ -444,6 +445,9 @@ class MainActivity : ComponentActivity() {
                 onOpenApprovals = {
                     currentScreen = Screen.APPROVALS
                 },
+                onOpenSmartAds = {
+                    currentScreen = Screen.SMART_ADS
+                },
                 onOpenSettings = {
                     currentScreen = Screen.SETTINGS
                 },
@@ -481,6 +485,28 @@ class MainActivity : ComponentActivity() {
                 onBack = {
                     currentScreen = Screen.HOME
                 }
+            )
+
+            Screen.SMART_ADS -> SmartAdsManagerScreen(
+                onBack = { currentScreen = Screen.MENU },
+                onGeneratePlan = { platform, goal, budget, location, offer ->
+                    val responseLanguage = if (currentLanguage == AssistantLanguage.HINGLISH) "natural Roman Hinglish" else "English"
+                    val prompt = """
+                        Create a practical advertising plan and ad draft for the user's business.
+                        Platform: $platform
+                        Main goal: $goal
+                        Daily budget: ₹$budget
+                        Target location: $location
+                        Business/offer details: $offer
+                        Return concise sections: recommended campaign objective, proposed audience/keywords,
+                        3 headline options, 2 ad descriptions, CTA, likely benefits, risks, metrics to watch,
+                        and checks needed before launch. Do not guarantee leads or sales. Do not claim account
+                        data was accessed. Treat budget as proposal only. Do not publish anything.
+                        User language: $responseLanguage.
+                    """.trimIndent()
+                    geminiClient.generateAngelResponse(prompt, emptyList(), currentLanguage)
+                },
+                onSpeak = { voiceManager.speak(it, currentLanguage) }
             )
 
             Screen.APPROVALS -> ApprovalScreen(
