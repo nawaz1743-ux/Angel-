@@ -11,7 +11,7 @@ This folder contains the cloud API foundation for Angel Smart Ads Manager. Googl
 - `POST /v1/approvals` — authenticated, durable draft-only proposal creation.
 - `GET /v1/approvals/{approval_id}` — authenticated retrieval of a stored proposal.
 
-The campaign analysis endpoint computes CTR/CPC and offers cautious checks for missing conversion tracking and low CTR. It does not yet fetch live Google/Meta metrics; the caller must supply the metrics, and this rule-based output is not a guarantee of calls or ROI.
+The campaign analysis endpoint computes CTR/CPC and cost per call when call tracking is marked configured, and offers cautious checks for missing conversion tracking and low CTR. It does not yet fetch live Google/Meta metrics; the caller must supply the metrics, and this rule-based output is not a guarantee of calls or ROI.
 
 Approval proposals are persisted to SQLite using `DATABASE_URL`. They remain `pending_review`; there is no approve/execute endpoint and no live ad change is applied by this foundation.
 
