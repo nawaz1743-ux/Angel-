@@ -34,6 +34,7 @@ import com.angel.assistant.ui.SettingsScreen
 import com.angel.assistant.voice.VoiceManager
 import com.angel.assistant.workflow.GoogleAdsApprovalWorkflow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 enum class Screen {
     HOME,
@@ -180,6 +181,78 @@ class MainActivity : ComponentActivity() {
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) return
+
+            // Explicit multi-step commands are executed locally in order. Each step is
+            // re-checked by the action router, including the finance-screen guard.
+            val multiSteps = actionCommandRouter.parseMultiStepCommand(userText)
+            if (multiSteps != null) {
+                val missingCallPermission = multiSteps.any { step ->
+                    actionCommandRouter.requiresCallPermission(step) &&
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity, Manifest.permission.CALL_PHONE
+                        ) != PackageManager.PERMISSION_GRANTED
+                }
+                val missingContactsPermission = multiSteps.any { step ->
+                    actionCommandRouter.requiresContactLookup(step) &&
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity, Manifest.permission.READ_CONTACTS
+                        ) != PackageManager.PERMISSION_GRANTED
+                }
+
+                if (missingCallPermission || missingContactsPermission) {
+                    messages.add(ChatMessage(text = userText, isFromUser = true))
+                    val permissionMessage = if (missingCallPermission) {
+                        "Sir, is task mein phone call ke liye Phone permission chahiye. Allow karke poora command dobara boliye."
+                    } else {
+                        "Sir, is task mein contact dhoondhne ke liye Contacts permission chahiye. Allow karke poora command dobara boliye."
+                    }
+                    messages.add(ChatMessage(
+                        text = permissionMessage,
+                        isFromUser = false,
+                        provider = "Angel Action System"
+                    ))
+                    voiceManager.speak(permissionMessage, currentLanguage)
+                    if (missingCallPermission) {
+                        callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                    } else {
+                        contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                    }
+                    return
+                }
+
+                messages.add(ChatMessage(text = userText, isFromUser = true))
+                scope.launch {
+                    val completedSteps = mutableListOf<String>()
+                    for ((index, step) in multiSteps.withIndex()) {
+                        val result = actionCommandRouter.handle(step)
+                        if (result == null) {
+                            completedSteps.add("Step ${index + 1}: Command samajh nahi aaya, isliye aage ke actions rok diye.")
+                            break
+                        }
+                        completedSteps.add("Step ${index + 1}: $result")
+
+                        // Give launched apps time to become the foreground window before
+                        // the next action. A call is terminal: never run more actions after it.
+                        val isCallStep = actionCommandRouter.requiresCallPermission(step) ||
+                            step.trim().lowercase().startsWith("whatsapp ")
+                        if (isCallStep) break
+                        if (index < multiSteps.lastIndex) {
+                            val opensApp = step.trim().lowercase().let {
+                                it.startsWith("open ") || it.startsWith("kholo ") || it.startsWith("launch ")
+                            }
+                            delay(if (opensApp) 1800L else 700L)
+                        }
+                    }
+                    val response = completedSteps.joinToString("\n")
+                    messages.add(ChatMessage(
+                        text = response,
+                        isFromUser = false,
+                        provider = "Angel Multi-step Task"
+                    ))
+                    voiceManager.speak(response, currentLanguage)
+                }
+                return
+            }
 
             // Direct calls are made only for an explicit call command. Android permission is required.
             if (
