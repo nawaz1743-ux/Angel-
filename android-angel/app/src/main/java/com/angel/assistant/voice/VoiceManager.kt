@@ -275,7 +275,7 @@ class VoiceManager(
         result = result.replace(Regex("__(.*?)__"), "$1")
         result = result.replace(Regex("(?<!\\*)\\*(?!\\*)(.*?)\\*(?!\\*)"), "$1")
         result = result.replace(Regex("(?<!_)_(?!_)(.*?)_(?!_)"), "$1")
-        result = result.replace("\`", "")
+        result = result.replace("`", "")
         result = result.replace("~", "")
         result = result.replace(Regex("#{1,6}\\s*"), "")
         result = result.replace(Regex("[|]+"), " ")
