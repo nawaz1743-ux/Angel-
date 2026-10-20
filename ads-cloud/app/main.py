@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 
 from .providers.registry import ProviderConfig, ProviderRegistry
 from .optimization import analyze_campaign
@@ -72,6 +72,16 @@ app = FastAPI(
     description="Extensible cloud foundation. Live provider actions remain disabled until secure integrations are deployed.",
 )
 
+
+class CampaignAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    provider: StrictStr
+    account_ref: StrictStr = Field(min_length=1, max_length=200)
+    impressions: StrictInt = Field(ge=0)
+    clicks: StrictInt = Field(ge=0)
+    spend: StrictFloat = Field(ge=0, le=100000000)
+    conversions: StrictInt | None = Field(default=None, ge=0)
+    conversion_tracking_configured: StrictBool = False
 
 class ApprovalRequest(BaseModel):
     provider: str
@@ -171,34 +181,36 @@ def get_approval_draft(approval_id: str, x_angel_api_key: str | None = Header(de
 
 
 @app.post("/v1/analysis/campaign")
-def analyze_campaign_metrics(payload: dict, x_angel_api_key: str | None = Header(default=None)) -> dict:
+def analyze_campaign_metrics(
+    payload: CampaignAnalysisRequest,
+    x_angel_api_key: str | None = Header(default=None),
+) -> dict:
     """Analyze caller-supplied normalized metrics; this endpoint never changes campaigns."""
     _require_api_key(x_angel_api_key)
-    provider_key = payload.get("provider")
-    provider = build_registry().get(provider_key) if isinstance(provider_key, str) else None
+    provider = build_registry().get(payload.provider)
     if provider is None:
         raise HTTPException(status_code=404, detail="Unsupported advertising platform.")
-    account_ref = payload.get("account_ref")
-    if not isinstance(account_ref, str) or not account_ref.strip() or len(account_ref) > 200:
-        raise HTTPException(status_code=422, detail="account_ref must be 1 to 200 characters.")
-    try:
-        impressions = int(payload.get("impressions", -1))
-        clicks = int(payload.get("clicks", -1))
-        spend = float(payload.get("spend", -1))
-        conversions = payload.get("conversions")
-        if impressions < 0 or clicks < 0 or spend < 0 or clicks > impressions:
-            raise ValueError()
-        if conversions is not None and (not isinstance(conversions, int) or conversions < 0 or conversions > clicks):
-            raise ValueError()
-        if not all(__import__("math").isfinite(v) for v in (spend,)):
-            raise ValueError()
-    except (TypeError, ValueError, OverflowError):
-        raise HTTPException(status_code=422, detail="Metrics must be non-negative and internally consistent.")
-    if payload.get("conversion_tracking_configured", False) not in (True, False):
-        raise HTTPException(status_code=422, detail="conversion_tracking_configured must be boolean.")
-    metrics = {"impressions": impressions, "clicks": clicks, "spend": spend,
-               "conversions": conversions,
-               "conversion_tracking_configured": payload.get("conversion_tracking_configured", False)}
-    return {"provider": provider.key, "account_ref": account_ref, "analysis": analyze_campaign(metrics),
-            "source": "user_supplied_metrics", "live_provider_data_fetched": False,
-            "campaign_changed": False, "approval_required_for_any_live_change": True}
+    if not payload.account_ref.strip():
+        raise HTTPException(status_code=422, detail="account_ref must not be blank.")
+    if payload.clicks > payload.impressions:
+        raise HTTPException(status_code=422, detail="Clicks cannot exceed impressions.")
+    if payload.conversions is not None and payload.conversions > payload.clicks:
+        raise HTTPException(status_code=422, detail="Conversions cannot exceed clicks.")
+    if not __import__("math").isfinite(payload.spend):
+        raise HTTPException(status_code=422, detail="Spend must be finite.")
+    metrics = {
+        "impressions": payload.impressions,
+        "clicks": payload.clicks,
+        "spend": payload.spend,
+        "conversions": payload.conversions,
+        "conversion_tracking_configured": payload.conversion_tracking_configured,
+    }
+    return {
+        "provider": provider.key,
+        "account_ref": payload.account_ref,
+        "analysis": analyze_campaign(metrics),
+        "source": "user_supplied_metrics",
+        "live_provider_data_fetched": False,
+        "campaign_changed": False,
+        "approval_required_for_any_live_change": True,
+    }
