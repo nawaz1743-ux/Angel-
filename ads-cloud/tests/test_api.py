@@ -76,3 +76,30 @@ def test_unknown_provider_rejected(monkeypatch):
         "proposed_change": {}, "estimated_risk": "low"
     })
     assert response.status_code == 404
+
+
+def test_campaign_analysis_is_authenticated_and_read_only(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    denied = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key": "wrong"}, json={"provider":"google_ads"})
+    assert denied.status_code == 401
+    response = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key":"test-secret"}, json={
+        "provider":"google_ads", "account_ref":"demo", "impressions":1000, "clicks":4,
+        "spend":500, "conversion_tracking_configured":False
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "user_supplied_metrics"
+    assert body["live_provider_data_fetched"] is False
+    assert body["campaign_changed"] is False
+    assert body["analysis"]["metrics"]["click_through_rate_percent"] == 0.4
+    codes = {item["code"] for item in body["analysis"]["recommendations"]}
+    assert "verify_conversion_tracking" in codes
+    assert "review_creative_and_targeting" in codes
+
+
+def test_campaign_analysis_rejects_inconsistent_metrics(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    response = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key":"test-secret"}, json={
+        "provider":"meta_ads", "account_ref":"demo", "impressions":10, "clicks":11, "spend":20
+    })
+    assert response.status_code == 422
