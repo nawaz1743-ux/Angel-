@@ -1,9 +1,13 @@
 package com.angel.assistant
 
 import android.content.ActivityNotFoundException
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.ContactsContract
+import androidx.core.content.ContextCompat
 import com.angel.assistant.service.AngelAccessibilityService
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -15,6 +19,9 @@ import java.nio.charset.StandardCharsets
 class ActionCommandRouter(private val context: Context) {
 
     private var pendingWhatsAppDraft = false
+
+    fun requiresContactLookup(rawCommand: String): Boolean =
+        extractContactCallName(rawCommand) != null
 
     fun handle(rawCommand: String): String? {
         val command = rawCommand.trim()
@@ -94,6 +101,11 @@ class ActionCommandRouter(private val context: Context) {
             }
         }
 
+        val contactName = extractContactCallName(command)
+        if (contactName != null) {
+            return callContact(contactName)
+        }
+
         val dial = command.matchCommand(listOf("dial ", "number dial karo ", "call number "))
         if (dial != null) {
             val digits = dial.filter { it.isDigit() || it == '+' }
@@ -170,6 +182,70 @@ class ActionCommandRouter(private val context: Context) {
             "$name open kar diya."
         } catch (_: Exception) {
             "$name open nahi ho paya."
+        }
+    }
+
+    private fun extractContactCallName(command: String): String? {
+        val prefixes = listOf("call contact ", "dial contact ", "call karo ", "phone karo ", "call ")
+        val prefix = prefixes.firstOrNull { command.startsWith(it, ignoreCase = true) } ?: return null
+        val name = command.substring(prefix.length).trim()
+            .replace(Regex("(?i)\\s+(ko call karo|ko phone karo|ko call|ko)$"), "")
+            .trim()
+        if (name.isBlank() || name.matches(Regex("[+0-9 ()-]+")) ||
+            name.startsWith("number ", ignoreCase = true) ||
+            name.startsWith("whatsapp ", ignoreCase = true)
+        ) return null
+        return name
+    }
+
+    private fun callContact(name: String): String {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return "Sir, Contacts permission chahiye. Angel ki permission allow karke command dobara boliye."
+        }
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER
+        )
+        val matches = mutableListOf<Pair<String, String>>()
+        try {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                projection,
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+                arrayOf("%$name%"),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
+            )?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                while (cursor.moveToNext() && matches.size < 6) {
+                    val contactName = cursor.getString(nameIndex).orEmpty()
+                    val number = cursor.getString(numberIndex).orEmpty()
+                    if (number.isNotBlank()) {
+                        val pair = contactName to number
+                        if (pair !in matches) matches.add(pair)
+                    }
+                }
+            }
+        } catch (_: SecurityException) {
+            return "Contacts access allow nahi hua. Settings mein Angel ki Contacts permission check karein."
+        } catch (_: Exception) {
+            return "Contact search nahi ho paya. Contact app mein naam check karein."
+        }
+
+        if (matches.isEmpty()) return "Sir, '$name' naam ka contact nahi mila."
+        if (matches.size > 1) {
+            val choices = matches.take(5).joinToString("\\n") { "${it.first}: ${it.second}" }
+            return "Sir, ek se zyada contacts mile. Kaunsa contact chahiye?\\n$choices"
+        }
+        val (contactName, number) = matches.first()
+        return try {
+            context.startActivity(
+                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${number.filter { it.isDigit() || it == '+' }}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            "$contactName ka number Dialer mein khol diya hai. Number check karke aap khud Call dabaiye."
+        } catch (_: Exception) {
+            "Dialer open nahi ho paya."
         }
     }
 
