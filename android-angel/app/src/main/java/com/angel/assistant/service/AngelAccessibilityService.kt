@@ -129,17 +129,44 @@ class AngelAccessibilityService : AccessibilityService() {
             val packageName = root.packageName?.toString().orEmpty()
             if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return false
             if (isSensitiveFinanceScreen(service)) return false
+            // WhatsApp versions/locales may expose these controls as content descriptions
+            // rather than visible text. Match only call-specific labels, never a generic icon.
             val targets = if (video) {
-                setOf("video call", "start video call", "video call button")
+                setOf("video call", "start video call", "video call button", "make video call")
             } else {
-                setOf("voice call", "start voice call", "voice call button")
+                setOf("voice call", "start voice call", "voice call button", "make voice call", "audio call")
             }
-            val callNode = findExactTextNode(root, targets) ?: return false
+            val callNode = findExactTextNode(root, targets)
+                ?: findCallControlNode(root, video)
+                ?: return false
             var clickable: AccessibilityNodeInfo? = callNode
             while (clickable != null && !clickable.isClickable) {
                 clickable = clickable.parent
             }
             return clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+        }
+
+
+        private fun findCallControlNode(
+            node: AccessibilityNodeInfo?,
+            video: Boolean
+        ): AccessibilityNodeInfo? {
+            if (node == null) return null
+            val label = listOf(
+                node.text?.toString().orEmpty(),
+                node.contentDescription?.toString().orEmpty(),
+                node.viewIdResourceName.orEmpty()
+            ).joinToString(" ").lowercase()
+            val hasCall = label.contains("call") || label.contains("phone")
+            val hasVideo = label.contains("video") || label.contains("camera")
+            val hasVoice = label.contains("voice") || label.contains("audio") || label.contains("phone")
+            val matches = hasCall && if (video) hasVideo else (hasVoice && !hasVideo)
+            if (matches && (node.isClickable || node.parent?.isClickable == true)) return node
+            for (i in 0 until node.childCount) {
+                val found = findCallControlNode(node.getChild(i), video)
+                if (found != null) return found
+            }
+            return null
         }
 
         /** Ends an active call only through the visible call UI after a spoken command. */
