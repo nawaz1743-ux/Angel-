@@ -17,6 +17,9 @@ class AngelAccessibilityService : AccessibilityService() {
             private set
 
         private var activeServiceInstance: AngelAccessibilityService? = null
+        // Short-lived in-memory snapshot for explicit screen-reading requests.
+        private var lastExternalPackage: String? = null
+        private var lastExternalScreenText: String = ""
 
         private val sensitivePackageHints = listOf(
             // UPI, wallets and payment apps
@@ -48,14 +51,16 @@ class AngelAccessibilityService : AccessibilityService() {
                 return "Screen reading paused for a banking or payment app."
             }
             val rootNode = service.rootInActiveWindow
-                ?: return "No active window content accessible."
+            val activePackage = rootNode?.packageName?.toString().orEmpty()
+            // Returning to Angel changes the active window, so use the transient
+            // snapshot from the last external app only when explicitly requested.
+            if (activePackage == service.packageName && lastExternalScreenText.isNotBlank()) {
+                return "Previous app: " + (lastExternalPackage ?: "unknown") + "\n" + lastExternalScreenText
+            }
+            if (rootNode == null) return "No active window content accessible."
             val builder = StringBuilder()
             extractNodeTextRecursive(rootNode, builder, 0)
-            return if (builder.isBlank()) {
-                "No readable text detected on screen."
-            } else {
-                builder.toString()
-            }
+            return if (builder.isBlank()) "No readable text detected on screen." else builder.toString()
         }
 
         /** Scrolls the current app's first available scrollable container. */
@@ -267,7 +272,7 @@ class AngelAccessibilityService : AccessibilityService() {
             node: AccessibilityNodeInfo?,
             target: String
         ): AccessibilityNodeInfo? {
-            if (node == null) return null
+            if (node == null || !node.isVisibleToUser) return null
             val text = node.text?.toString()?.lowercase().orEmpty()
             val description = node.contentDescription?.toString()?.lowercase().orEmpty()
             if (text == target || description == target ||
@@ -286,7 +291,7 @@ class AngelAccessibilityService : AccessibilityService() {
             out: StringBuilder,
             depth: Int
         ) {
-            if (node == null || depth > 10) return
+            if (node == null || depth > 10 || !node.isVisibleToUser) return
             val text = node.text?.toString()?.trim()
             val contentDesc = node.contentDescription?.toString()?.trim()
             if (!text.isNullOrEmpty()) {
@@ -308,7 +313,25 @@ class AngelAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // No automatic actions are triggered by screen events.
+        // Screen events never trigger actions. Keep a short-lived text snapshot so
+        // the user can return to Angel and explicitly request "read screen".
+        val eventPackage = event?.packageName?.toString()?.lowercase().orEmpty()
+        if (eventPackage.isBlank()) return
+        if (sensitivePackageHints.any { eventPackage.contains(it) }) {
+            lastExternalPackage = null
+            lastExternalScreenText = ""
+            return
+        }
+        if (eventPackage == packageName.lowercase()) return
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString()?.lowercase() != eventPackage) return
+        val builder = StringBuilder()
+        extractNodeTextRecursive(root, builder, 0)
+        val snapshot = builder.toString().trim()
+        if (snapshot.isNotBlank()) {
+            lastExternalPackage = eventPackage
+            lastExternalScreenText = snapshot.take(12000)
+        }
     }
 
     override fun onInterrupt() {
