@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets
  */
 class ActionCommandRouter(private val context: Context) {
 
+    private var pendingWhatsAppDraft = false
+
     fun handle(rawCommand: String): String? {
         val command = rawCommand.trim()
         val normalized = command.lowercase()
@@ -92,16 +94,23 @@ class ActionCommandRouter(private val context: Context) {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits?text=$encoded"))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
-                "WhatsApp mein message draft kholne ki koshish ki hai. Message padh kar check karein; Angel ne send nahi kiya."
+                pendingWhatsAppDraft = true
+                "WhatsApp mein message draft khol diya. Sir, message check karke jab aap 'send' kahenge tabhi Angel Send button dabane ki koshish karegi."
             } catch (_: Exception) {
                 "WhatsApp draft open nahi ho paya. WhatsApp installed hai aur number sahi hai, check karein."
             }
         }
 
-        if (normalized in listOf("send", "send it", "bhej do", "haan send karo", "confirm send")) {
-            // Sending is deliberately not automated yet: an explicit confirmation must
-            // not accidentally tap a similarly named control in an unknown app.
-            return "Sir, message send karne ke liye WhatsApp mein draft check karke Send button khud dabaiye. Angel abhi automatically send nahi karegi."
+        if (normalized in listOf("send", "send it", "bhej do", "haan send karo", "confirm send", "send karo")) {
+            if (!pendingWhatsAppDraft) {
+                return "Sir, koi pending WhatsApp draft nahi hai. Pehle message draft karwa lijiye."
+            }
+            val sent = AngelAccessibilityService.clickWhatsAppSendButton()
+            if (sent) {
+                pendingWhatsAppDraft = false
+                return "WhatsApp ka Send button dabaya gaya. Agar app ne message accept kiya hai to message chala gaya hoga."
+            }
+            return "Sir, WhatsApp ka Send button nahi dabaya. Confirm karein ki WhatsApp draft screen khuli hai; agar button nazar nahi aa raha to aap khud send karein."
         }
 
         return null
