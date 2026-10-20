@@ -20,6 +20,19 @@ class AngelAccessibilityService : AccessibilityService() {
         // Short-lived in-memory snapshot for explicit screen-reading requests.
         private var lastExternalPackage: String? = null
         private var lastExternalScreenText: String = ""
+        private var lastExternalCapturedAtMillis: Long = 0L
+        private const val SCREEN_SNAPSHOT_TTL_MS = 30_000L
+
+        // High-risk screen content indicators. This deliberately errs on the side of
+        // pausing interaction when an app exposes PIN, OTP, transfer or payment controls.
+        private val sensitiveTextHints = listOf(
+            "upi pin", "transaction pin", "payment pin", "enter pin", "enter your pin",
+            "enter otp", "one time password", "verify otp", "collect request",
+            "approve collect", "confirm transfer", "transfer amount", "pay now",
+            "scan and pay", "scan to pay", "secure payment", "payment details",
+            "net banking", "debit account", "credit account", "beneficiary account",
+            "card number", "cvv", "bank account number", "confirm payment"
+        )
 
         private val sensitivePackageHints = listOf(
             // UPI, wallets and payment apps
@@ -32,12 +45,37 @@ class AngelAccessibilityService : AccessibilityService() {
             "rbl", "yesbank", "mobank", "bankofbaroda", "bobworld"
         )
 
+        private fun clearExternalSnapshot() {
+            lastExternalPackage = null
+            lastExternalScreenText = ""
+            lastExternalCapturedAtMillis = 0L
+        }
+
+        private fun containsSensitiveFinanceText(text: String): Boolean {
+            val normalized = text.lowercase()
+            return sensitiveTextHints.any { hint -> normalized.contains(hint) }
+        }
+
         private fun isSensitiveFinanceScreen(service: AngelAccessibilityService): Boolean {
-            val packageName = service.rootInActiveWindow?.packageName
-                ?.toString()?.lowercase().orEmpty()
+            val root = service.rootInActiveWindow
+            val packageName = root?.packageName?.toString()?.lowercase().orEmpty()
+            // Angel's own chat may discuss finance safety; only classify its foreground
+            // window by package here, not by the words in Angel's conversation.
+            if (packageName == service.packageName.lowercase()) return false
             // Fail closed if Android does not expose the foreground package.
-            return packageName.isBlank() ||
+            if (packageName.isBlank() ||
                 sensitivePackageHints.any { hint -> packageName.contains(hint) }
+            ) return true
+
+            if (root != null) {
+                val builder = StringBuilder()
+                extractNodeTextRecursive(root, builder, 0)
+                if (containsSensitiveFinanceText(builder.toString())) {
+                    clearExternalSnapshot()
+                    return true
+                }
+            }
+            return false
         }
 
         /**
@@ -55,7 +93,14 @@ class AngelAccessibilityService : AccessibilityService() {
             // Returning to Angel changes the active window, so use the transient
             // snapshot from the last external app only when explicitly requested.
             if (activePackage == service.packageName && lastExternalScreenText.isNotBlank()) {
-                return "Previous app: " + (lastExternalPackage ?: "unknown") + "\n" + lastExternalScreenText
+                val age = System.currentTimeMillis() - lastExternalCapturedAtMillis
+                if (age in 0..SCREEN_SNAPSHOT_TTL_MS &&
+                    !containsSensitiveFinanceText(lastExternalScreenText)
+                ) {
+                    return "Previous app: " + (lastExternalPackage ?: "unknown") + "\n" + lastExternalScreenText
+                }
+                clearExternalSnapshot()
+                return "Previous screen text expired or was blocked for finance safety. Open the app again and request screen reading."
             }
             if (rootNode == null) return "No active window content accessible."
             val builder = StringBuilder()
@@ -318,8 +363,7 @@ class AngelAccessibilityService : AccessibilityService() {
         val eventPackage = event?.packageName?.toString()?.lowercase().orEmpty()
         if (eventPackage.isBlank()) return
         if (sensitivePackageHints.any { eventPackage.contains(it) }) {
-            lastExternalPackage = null
-            lastExternalScreenText = ""
+            clearExternalSnapshot()
             return
         }
         if (eventPackage == packageName.lowercase()) return
@@ -328,9 +372,16 @@ class AngelAccessibilityService : AccessibilityService() {
         val builder = StringBuilder()
         extractNodeTextRecursive(root, builder, 0)
         val snapshot = builder.toString().trim()
+        // Some payment flows run inside browsers or non-bank apps. Detect strong
+        // sensitive-screen text markers before caching any content from that window.
+        if (containsSensitiveFinanceText(snapshot)) {
+            clearExternalSnapshot()
+            return
+        }
         if (snapshot.isNotBlank()) {
             lastExternalPackage = eventPackage
             lastExternalScreenText = snapshot.take(12000)
+            lastExternalCapturedAtMillis = System.currentTimeMillis()
         }
     }
 
@@ -341,6 +392,7 @@ class AngelAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         isServiceRunning = false
         if (activeServiceInstance === this) activeServiceInstance = null
+        clearExternalSnapshot()
         super.onDestroy()
         Log.i("AngelAccessibility", "Angel Accessibility Service destroyed.")
     }
