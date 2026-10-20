@@ -70,6 +70,30 @@ class ActionCommandRouter(private val context: Context) {
             return openApp(appName)
         }
 
+        if (normalized in listOf("hang up", "end call", "call drop karo", "call kaat do", "phone kaat do", "disconnect call")) {
+            return actionResult(
+                AngelAccessibilityService.clickEndCallButton(),
+                "Call end karne ka action diya.",
+                "Active call ka End Call button nahi mila. Agar call screen par hain, phone ke visible end button ko dabaiye."
+            )
+        }
+
+        val whatsappCall = Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:voice call|video call|call)\\s+(?:to\\s+)?(\\+?[0-9][0-9 ()-]{6,})$""")
+            .find(command)
+        if (whatsappCall != null) {
+            val digits = whatsappCall.groupValues[1].filter { it.isDigit() }
+            if (digits.length < 8) return "Sir, country code ke saath WhatsApp contact number boliye."
+            return try {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                "WhatsApp contact khol diya. Wahan contact check karke Voice Call ya Video Call button aap dabaiye; Angel call khud start nahi karegi."
+            } catch (_: Exception) {
+                "WhatsApp contact open nahi ho paya."
+            }
+        }
+
         val dial = command.matchCommand(listOf("dial ", "number dial karo ", "call number "))
         if (dial != null) {
             val digits = dial.filter { it.isDigit() || it == '+' }
