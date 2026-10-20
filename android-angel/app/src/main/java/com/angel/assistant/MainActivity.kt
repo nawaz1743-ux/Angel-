@@ -31,6 +31,7 @@ import com.angel.assistant.ui.ChatScreen
 import com.angel.assistant.ui.HomeScreen
 import com.angel.assistant.ui.MenuScreen
 import com.angel.assistant.ui.SettingsScreen
+import com.angel.assistant.ui.SmartAdsManagerScreen
 import com.angel.assistant.voice.VoiceManager
 import com.angel.assistant.workflow.GoogleAdsApprovalWorkflow
 import kotlinx.coroutines.launch
