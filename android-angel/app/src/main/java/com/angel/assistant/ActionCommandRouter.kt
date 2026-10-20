@@ -57,9 +57,21 @@ class ActionCommandRouter(private val context: Context) {
                     "what is on my screen", "hang up", "end call", "call drop karo",
                     "call kaat do", "phone kaat do", "disconnect call") ||
                 requiresCallPermission(step) || n.startsWith("dial ") ||
-                n.startsWith("number dial karo ")
+                n.startsWith("number dial karo ") ||
+                parseWhatsAppDraft(step) != null ||
+                Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:(?:voice|video)\\s+)?call\\s+(?:to\\s+)?\\+?[0-9][0-9 ()-]{6,}$""").matches(step)
         }
-        return if (allowed) parts else null
+        if (!allowed) return null
+
+        // A call is terminal in a sequence so later steps cannot accidentally act
+        // on the live-call UI. Sending a message also remains a separate confirmation.
+        val callIndexes = parts.indices.filter { index ->
+            requiresCallPermission(parts[index]) ||
+                Regex("""(?i)^(?:whatsapp|whats app)\\s+(?:(?:voice|video)\\s+)?call\\s+(?:to\\s+)?\\+?[0-9][0-9 ()-]{6,}$""").matches(parts[index])
+        }
+        if (callIndexes.any { it != parts.lastIndex }) return null
+        if (parts.any { it.trim().lowercase() in listOf("send", "send it", "send karo", "bhej do", "confirm send") }) return null
+        return parts
     }
 
     fun handle(rawCommand: String): String? {
