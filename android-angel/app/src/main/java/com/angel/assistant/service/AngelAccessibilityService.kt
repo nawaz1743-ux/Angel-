@@ -19,15 +19,21 @@ class AngelAccessibilityService : AccessibilityService() {
         private var activeServiceInstance: AngelAccessibilityService? = null
 
         private val sensitivePackageHints = listOf(
+            // UPI, wallets and payment apps
             "bank", "banking", "upi", "paytm", "phonepe", "phonpe",
             "google.android.apps.nbu.paisa", "gpay", "tez", "bhim",
-            "cred", "mobikwik", "amazonpay", "payzapp", "yono"
+            "cred", "mobikwik", "amazonpay", "payzapp", "yono",
+            // Common Indian bank app package-name fragments
+            "sbi", "lotus", "icici", "axis", "kotak", "hdfc", "pnb",
+            "unionbank", "canara", "idbi", "indusind", "federal",
+            "rbl", "yesbank", "mobank", "bankofbaroda", "bobworld"
         )
 
         private fun isSensitiveFinanceScreen(service: AngelAccessibilityService): Boolean {
             val packageName = service.rootInActiveWindow?.packageName
                 ?.toString()?.lowercase().orEmpty()
-            return packageName.isNotBlank() &&
+            // Fail closed if Android does not expose the foreground package.
+            return packageName.isBlank() ||
                 sensitivePackageHints.any { hint -> packageName.contains(hint) }
         }
 
