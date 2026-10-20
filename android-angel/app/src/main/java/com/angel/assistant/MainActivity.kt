@@ -70,6 +70,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val contactsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        Toast.makeText(
+            this,
+            if (granted) {
+                "Contacts permission granted. Repeat your call command."
+            } else {
+                "Contacts permission denied. Angel cannot search contacts."
+            },
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -152,6 +166,22 @@ class MainActivity : ComponentActivity() {
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) return
+
+            // Ask for Contacts permission only when a contact-call command needs it.
+            if (
+                actionCommandRouter.requiresContactLookup(userText) &&
+                ContextCompat.checkSelfPermission(
+                    this@MainActivity,
+                    Manifest.permission.READ_CONTACTS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                val permissionMessage = "Sir, contact dhoondhne ke liye Contacts permission chahiye. Prompt mein Allow karein, phir call command dobara boliye."
+                messages.add(ChatMessage(text = userText, isFromUser = true))
+                messages.add(ChatMessage(text = permissionMessage, isFromUser = false, provider = "Angel Action System"))
+                voiceManager.speak(permissionMessage, currentLanguage)
+                contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                return
+            }
 
             // Recognized device commands run locally; ordinary conversation still goes to Gemini.
             val actionResult = actionCommandRouter.handle(userText)
