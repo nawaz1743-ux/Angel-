@@ -1,10 +1,16 @@
 """Angel Ads Cloud API foundation.
 
-This service deliberately reports integrations as unavailable until provider OAuth,
-secure token storage, and official API adapters are configured. It does not pretend
-that a provider is connected or perform any live ad-account mutation.
+Provider writes remain disabled until OAuth, encrypted token storage, live
+provider adapters, and durable approval execution are implemented.
 """
+import json
 import os
+import sqlite3
+import uuid
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
@@ -24,25 +30,62 @@ def build_registry() -> ProviderRegistry:
     ])
 
 
+def _database_path() -> str:
+    configured = os.getenv("DATABASE_URL", "sqlite:///./angel_ads.db").strip()
+    if not configured.startswith("sqlite:///"):
+        # Non-SQLite database URLs are not silently treated as SQLite paths.
+        raise RuntimeError("This build supports SQLite only; configure a supported database adapter before using DATABASE_URL.")
+    return configured.removeprefix("sqlite:///")
+
+
+@contextmanager
+def _db():
+    path = _database_path()
+    if path != ":memory:":
+        Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path, timeout=10)
+    connection.row_factory = sqlite3.Row
+    try:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS approval_drafts (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                account_ref TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                proposed_change_json TEXT NOT NULL,
+                estimated_risk TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        connection.commit()
+        yield connection
+        connection.commit()
+    finally:
+        connection.close()
+
+
 app = FastAPI(
     title="Angel Ads Cloud API",
-    version="0.1.0",
-    description="Extensible cloud foundation for Angel's advertising assistant. Live provider actions are disabled until OAuth and API adapters are deployed.",
+    version="0.2.0",
+    description="Extensible cloud foundation. Live provider actions remain disabled until secure integrations are deployed.",
 )
-
-
-class MonitoringConfig(BaseModel):
-    enabled: bool = False
-    interval_minutes: int = Field(default=30, ge=15, le=360)
-    notify_on_anomaly: bool = True
 
 
 class ApprovalRequest(BaseModel):
     provider: str
-    account_ref: str
+    account_ref: str = Field(min_length=1, max_length=200)
     summary: str = Field(min_length=1, max_length=2000)
     proposed_change: dict = Field(default_factory=dict)
     estimated_risk: str = Field(default="medium", pattern="^(low|medium|high)$")
+
+
+def _require_api_key(supplied: str | None) -> None:
+    expected = os.getenv("ANGEL_ADS_API_KEY", "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="Ads API is not configured by the deployment owner yet.")
+    if not supplied or supplied != expected:
+        raise HTTPException(status_code=401, detail="Invalid API authorization.")
 
 
 @app.get("/health")
@@ -56,8 +99,7 @@ def capabilities() -> dict:
     return {
         "platforms": [
             {"key": p.key, "name": p.display_name, "configured": p.configured,
-             "supports_read": p.supports_read, "supports_drafts": p.supports_drafts,
-             "supports_write": p.supports_write}
+             "supports_read": False, "supports_drafts": True, "supports_write": False}
             for p in providers
         ],
         "future_platforms_supported": True,
@@ -72,7 +114,7 @@ def monitoring_status() -> dict:
     return {
         "requested_enabled": os.getenv("MONITORING_ENABLED", "false").lower() == "true",
         "operational": False,
-        "reason": "Cloud scheduler, durable account connections, and provider metrics adapters must be deployed before monitoring can run.",
+        "reason": "A deployed scheduler, OAuth connections, and live provider metrics adapters are not implemented yet.",
         "default_interval_minutes": 30,
         "approval_required_for_campaign_changes": True,
     }
@@ -80,25 +122,48 @@ def monitoring_status() -> dict:
 
 @app.post("/v1/approvals", status_code=202)
 def create_approval_draft(request: ApprovalRequest, x_angel_api_key: str | None = Header(default=None)) -> dict:
-    """Accept a draft only when an API key is configured and matches.
-
-    Durable storage and execution are intentionally not implemented in this scaffold;
-    this endpoint returns a transparent draft-only status and never changes live ads.
-    """
-    expected = os.getenv("ANGEL_ADS_API_KEY", "").strip()
-    if not expected:
-        raise HTTPException(status_code=503, detail="Ads API is not configured by the deployment owner yet.")
-    if not x_angel_api_key or x_angel_api_key != expected:
-        raise HTTPException(status_code=401, detail="Invalid API authorization.")
+    """Persist a proposal for review. This endpoint never approves or executes it."""
+    _require_api_key(x_angel_api_key)
     provider = build_registry().get(request.provider)
     if provider is None:
         raise HTTPException(status_code=404, detail="Unsupported advertising platform.")
+    approval_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    with _db() as connection:
+        connection.execute(
+            """INSERT INTO approval_drafts
+               (id, provider, account_ref, summary, proposed_change_json, estimated_risk, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending_review', ?)""",
+            (approval_id, provider.key, request.account_ref, request.summary,
+             json.dumps(request.proposed_change), request.estimated_risk, created_at),
+        )
     return {
-        "status": "draft_only",
-        "approval_id": None,
+        "status": "pending_review",
+        "approval_id": approval_id,
         "provider": provider.key,
         "summary": request.summary,
         "estimated_risk": request.estimated_risk,
         "live_change_applied": False,
-        "message": "Draft received. Durable approval storage and live provider execution are not implemented yet.",
+        "created_at": created_at,
+        "message": "Proposal stored for review only. No live campaign change was applied.",
+    }
+
+
+@app.get("/v1/approvals/{approval_id}")
+def get_approval_draft(approval_id: str, x_angel_api_key: str | None = Header(default=None)) -> dict:
+    _require_api_key(x_angel_api_key)
+    with _db() as connection:
+        row = connection.execute("SELECT * FROM approval_drafts WHERE id = ?", (approval_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Approval draft not found.")
+    return {
+        "approval_id": row["id"],
+        "provider": row["provider"],
+        "account_ref": row["account_ref"],
+        "summary": row["summary"],
+        "proposed_change": json.loads(row["proposed_change_json"]),
+        "estimated_risk": row["estimated_risk"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "live_change_applied": False,
     }
