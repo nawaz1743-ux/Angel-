@@ -80,7 +80,7 @@ def test_unknown_provider_rejected(monkeypatch):
 
 def test_campaign_analysis_is_authenticated_and_read_only(monkeypatch):
     monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
-    denied = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key": "wrong"}, json={"provider":"google_ads"})
+    denied = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key": "wrong"}, json={"provider":"google_ads", "account_ref":"demo", "impressions":100, "clicks":10, "spend":10.0})
     assert denied.status_code == 401
     response = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key":"test-secret"}, json={
         "provider":"google_ads", "account_ref":"demo", "impressions":1000, "clicks":4,
