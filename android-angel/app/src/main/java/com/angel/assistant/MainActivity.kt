@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
 
     private val geminiClient = GeminiApiClient()
     private val adsWorkflow = GoogleAdsApprovalWorkflow()
+    private val actionCommandRouter by lazy { ActionCommandRouter(this) }
 
     private var isListeningState = mutableStateOf(false)
     private var isSpeakingState = mutableStateOf(false)
@@ -153,7 +154,7 @@ class MainActivity : ComponentActivity() {
             if (userText.isBlank()) return
 
             // Recognized device commands run locally; ordinary conversation still goes to Gemini.
-            val actionResult = ActionCommandRouter(this@MainActivity).handle(userText)
+            val actionResult = actionCommandRouter.handle(userText)
             if (actionResult != null) {
                 messages.add(
                     ChatMessage(
