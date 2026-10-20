@@ -77,6 +77,12 @@ class AngelAccessibilityService : AccessibilityService() {
         fun clickVisibleTarget(target: String): Boolean {
             val service = activeServiceInstance ?: return false
             if (target.isBlank() || isSensitiveFinanceScreen(service)) return false
+            // Never let a generic voice tap target payment/transfer controls.
+            val blockedTarget = Regex(
+                """\\b(pay|payment|upi|transfer money|send money|bank transfer|confirm payment|approve payment)\\b""",
+                RegexOption.IGNORE_CASE
+            )
+            if (blockedTarget.containsMatchIn(target)) return false
             val root = service.rootInActiveWindow ?: return false
             return findMatchingNode(root, target.trim().lowercase())?.let { node ->
                 var clickable: AccessibilityNodeInfo? = node
