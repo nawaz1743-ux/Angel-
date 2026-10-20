@@ -103,3 +103,28 @@ def test_campaign_analysis_rejects_inconsistent_metrics(monkeypatch):
         "provider":"meta_ads", "account_ref":"demo", "impressions":10, "clicks":11, "spend":20
     })
     assert response.status_code == 422
+
+
+def test_campaign_analysis_rejects_fractional_counts_and_unknown_fields(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    headers = {"X-Angel-Api-Key": "test-secret"}
+    fractional = client.post("/v1/analysis/campaign", headers=headers, json={
+        "provider": "google_ads", "account_ref": "demo", "impressions": 100,
+        "clicks": 1.5, "spend": 10.0
+    })
+    assert fractional.status_code == 422
+    extra_field = client.post("/v1/analysis/campaign", headers=headers, json={
+        "provider": "google_ads", "account_ref": "demo", "impressions": 100,
+        "clicks": 10, "spend": 10.0, "execute_now": True
+    })
+    assert extra_field.status_code == 422
+
+
+def test_campaign_analysis_rejects_conversions_greater_than_clicks(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    response = client.post("/v1/analysis/campaign", headers={"X-Angel-Api-Key": "test-secret"}, json={
+        "provider": "google_ads", "account_ref": "demo", "impressions": 100,
+        "clicks": 10, "spend": 20.0, "conversions": 11,
+        "conversion_tracking_configured": True
+    })
+    assert response.status_code == 422
