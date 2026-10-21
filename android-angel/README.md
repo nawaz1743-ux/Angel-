@@ -20,10 +20,10 @@ A dedicated, native Android AI assistant built with **Kotlin** and **Jetpack Com
 3. **Voice Input & Spoken Responses**:
    - Native Android `SpeechRecognizer` for touch-to-talk voice recognition.
    - Native `TextToSpeech` configured for Indian English female voice playback.
-4. **Secure Gemini AI Integration**:
-   - Direct integration with Google Gemini (`gemini-2.5-flash`).
-   - **Zero Secrets in Code**: The API key is loaded from `local.properties` (or environment variable `GEMINI_API_KEY`) at build time via `BuildConfig.GEMINI_API_KEY`.
-   - **Offline Fallback Engine**: If no API key is supplied or the phone is offline, Angel responds via an intelligent embedded local engine for tasks, greetings, dates, and phone intents.
+4. **Secure AI Integration**:
+   - Angel sends chat requests to the Angel Cloud API over HTTPS.
+   - The Gemini provider key is stored only in the cloud host's `GEMINI_API_KEY` secret and is not packaged in the Android APK.
+   - The Android build receives only the public HTTPS base URL through `ANGEL_AI_API_BASE_URL`; AI chat remains unavailable until the cloud service is deployed and configured.
 5. **Screen Understanding (Accessibility Service)**:
    - Structured `AngelAccessibilityService` foundation for safe, consent-driven screen reading.
    - Does not perform unsolicited automated clicks or hidden background actions. Requires explicit user activation in Samsung Accessibility settings.
@@ -65,7 +65,7 @@ android-angel/
             ├── theme/                 # Material 3 Color, Type, and Theme
             ├── data/
             │   ├── model/             # ChatMessage, AssistantLanguage, ActionIntent, GoogleAdsApprovalItem
-            │   └── api/               # GeminiApiClient (Secure HTTP with local fallback)
+            │   └── api/               # GeminiApiClient (HTTPS cloud proxy)
             ├── voice/                 # VoiceManager (SpeechRecognizer & TextToSpeech)
             ├── service/               # AngelAccessibilityService (Screen understanding)
             ├── workflow/              # GoogleAdsApprovalWorkflow (Safeguarded campaign review)
@@ -97,10 +97,10 @@ android-angel/
    # macOS example:
    # sdk.dir=/Users/YourUsername/Library/Android/sdk
 
-   # Optional Google AI Studio Gemini API Key:
-   GEMINI_API_KEY=AIzaSy...your_gemini_api_key_here
+   # Optional: public HTTPS base URL of the deployed Angel AI server:
+   ANGEL_AI_API_BASE_URL=https://your-deployed-angel-cloud.example
    ```
-   *(If you leave `GEMINI_API_KEY` blank, Angel will run using her built-in offline engine).*
+   **Do not put `GEMINI_API_KEY` in Android `local.properties` or in the APK.** Configure that secret only in the cloud host's secret settings. If the server URL is blank or the server is not deployed, AI chat will show a server-configuration message.
 
 ---
 
