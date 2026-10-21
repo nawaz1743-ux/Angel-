@@ -214,3 +214,49 @@ def test_angel_chat_rejects_unsupported_language_and_roles(monkeypatch):
         "language": "english",
     })
     assert invalid_role.status_code == 422
+
+
+
+def test_live_oauth_fails_closed_without_server_configuration(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    monkeypatch.delenv("GOOGLE_ADS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_ADS_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("GOOGLE_ADS_DEVELOPER_TOKEN", raising=False)
+    monkeypatch.delenv("GOOGLE_ADS_REDIRECT_URI", raising=False)
+    response = client.get("/v1/ads/connect/google_ads", headers={"X-Angel-Api-Key": "test-secret"})
+    assert response.status_code == 503
+    assert "not configured" in response.json()["detail"].lower()
+
+
+def test_live_ads_rejects_unknown_provider(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    response = client.get("/v1/ads/connect/other", headers={"X-Angel-Api-Key": "test-secret"})
+    assert response.status_code == 404
+
+
+def test_live_ads_connection_list_needs_api_key(monkeypatch):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    response = client.get("/v1/ads/connections", headers={"X-Angel-Api-Key": "wrong"})
+    assert response.status_code == 401
+
+
+def test_approval_decision_requires_explicit_confirmation(monkeypatch, tmp_path):
+    monkeypatch.setenv("ANGEL_ADS_API_KEY", "test-secret")
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///" + str(tmp_path / "approval.db"))
+    created = client.post("/v1/approvals", headers={"X-Angel-Api-Key": "test-secret"}, json={
+        "provider": "google_ads", "account_ref": "demo", "summary": "Pause campaign after review",
+        "proposed_change": {"type": "set_campaign_status", "campaign_id": "123", "status": "PAUSED"},
+        "estimated_risk": "medium"
+    })
+    assert created.status_code == 202
+    approval_id = created.json()["approval_id"]
+    denied = client.post(f"/v1/ads/approvals/{approval_id}/decision",
+        headers={"X-Angel-Api-Key": "test-secret"},
+        json={"decision": "approve", "confirmation_text": "yes"})
+    assert denied.status_code == 422
+    approved = client.post(f"/v1/ads/approvals/{approval_id}/decision",
+        headers={"X-Angel-Api-Key": "test-secret"},
+        json={"decision": "approve", "confirmation_text": f"approve {approval_id}"})
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved_not_executed"
+    assert approved.json()["live_change_applied"] is False
