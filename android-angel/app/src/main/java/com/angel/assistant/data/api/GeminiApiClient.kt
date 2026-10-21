@@ -48,6 +48,7 @@ class GeminiApiClient {
         language: AssistantLanguage
     ): String = withContext(Dispatchers.IO) {
 
+        lastUsedModel = null
         val apiKey = BuildConfig.GEMINI_API_KEY.trim()
 
         if (
