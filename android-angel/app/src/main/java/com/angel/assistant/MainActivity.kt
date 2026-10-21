@@ -122,6 +122,11 @@ class MainActivity : ComponentActivity() {
                 runOnUiThread {
                     isSpeakingState.value = speaking
                 }
+            },
+            onListeningStateChanged = { listening ->
+                runOnUiThread {
+                    isListeningState.value = listening
+                }
             }
         )
 
@@ -379,35 +384,10 @@ class MainActivity : ComponentActivity() {
 
         fun handleMicToggle() {
             if (isListening) {
-                // stopListening() returns before Android delivers the final recognition
-                // callback. Wait briefly for that callback instead of submitting a stale
-                // partial transcript immediately.
-                isFinalTranscriptState.value = false
+                // Stop capture; final text is submitted automatically when Android
+                // calls onResults. Do not require a second tap or submit partial text.
                 voiceManager.stopListening()
                 isListeningState.value = false
-
-                scope.launch {
-                    for (attempt in 0 until 12) {
-                        if (isFinalTranscriptState.value) break
-                        delay(150L)
-                    }
-
-                    val spoken = transcriptState.value.trim()
-                    val hasFinalResult = isFinalTranscriptState.value
-
-                    if (hasFinalResult && spoken.isNotBlank()) {
-                        handleSendMessage(spoken)
-                    } else {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Sir, awaaz ka final text nahi mila. Dobara bolkar try karein.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    transcriptState.value = ""
-                    isFinalTranscriptState.value = false
-                }
             } else {
                 if (
                     ContextCompat.checkSelfPermission(
@@ -423,6 +403,25 @@ class MainActivity : ComponentActivity() {
                 isFinalTranscriptState.value = false
                 voiceManager.startListening(currentLanguage)
                 isListeningState.value = true
+            }
+        }
+
+        // A final speech result automatically enters the same send pipeline as typed text.
+        // This removes the old second-tap requirement and avoids submitting stale partial text.
+        LaunchedEffect(isFinalTranscript) {
+            if (isFinalTranscript) {
+                val spoken = transcriptState.value.trim()
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                if (spoken.isNotBlank()) {
+                    handleSendMessage(spoken)
+                } else if (!isListeningState.value) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Sir, awaaz clear nahi mili. Mic dabakar dobara boliye.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
 
