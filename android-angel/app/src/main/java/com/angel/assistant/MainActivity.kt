@@ -474,6 +474,7 @@ class MainActivity : ComponentActivity() {
                     currentScreen = Screen.CHAT
                 },
                 onHandsFree = {
+                    currentScreen = Screen.CHAT
                     handleMicToggle()
                 }
             )
