@@ -17,10 +17,10 @@ def test_capabilities_are_transparent_and_extensible():
     assert response.status_code == 200
     body = response.json()
     assert body["future_platforms_supported"] is True
-    assert body["live_account_connections_implemented"] is False
+    assert body["live_account_connections_implemented"] is True
     assert body["live_campaign_writes_enabled"] is False
     assert {p["key"] for p in body["platforms"]} == {"google_ads", "meta_ads"}
-    assert all(p["supports_read"] is False for p in body["platforms"])
+    assert all(p["supports_read"] is False for p in body["platforms"])  # no provider credentials are configured in CI
 
 
 def test_monitoring_does_not_claim_to_be_live():
