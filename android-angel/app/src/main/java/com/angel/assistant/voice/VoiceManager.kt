@@ -16,7 +16,8 @@ class VoiceManager(
     private val context: Context,
     private val onTranscript: (String, Boolean) -> Unit,
     private val onSpeakingStateChanged: (Boolean) -> Unit,
-    private val onRecognitionStateChanged: (Boolean) -> Unit
+    private val onRecognitionStateChanged: (Boolean) -> Unit,
+    private val onRecognitionError: (Int) -> Unit
 ) : TextToSpeech.OnInitListener {
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -140,12 +141,12 @@ class VoiceManager(
         }
     }
 
-    fun startListening(language: AssistantLanguage) {
+    fun startListening(language: AssistantLanguage): Boolean {
         val recognizer = speechRecognizer ?: run {
             onRecognitionStateChanged(false)
-            return
+            return false
         }
-        if (recognitionActive) return
+        if (recognitionActive) return true
 
         val intent = Intent(
             RecognizerIntent.ACTION_RECOGNIZE_SPEECH
@@ -172,10 +173,12 @@ class VoiceManager(
             recognitionActive = true
             onRecognitionStateChanged(true)
             recognizer.startListening(intent)
+            true
         } catch (e: Exception) {
             recognitionActive = false
             onRecognitionStateChanged(false)
             Log.e(TAG, "startListening error: ${e.message}", e)
+            false
         }
     }
 
@@ -468,6 +471,7 @@ class VoiceManager(
             override fun onError(error: Int) {
                 recognitionActive = false
                 onRecognitionStateChanged(false)
+                onRecognitionError(error)
                 Log.w(TAG, "Recognition error code: $error")
             }
 
