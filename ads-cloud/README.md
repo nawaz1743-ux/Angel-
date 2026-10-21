@@ -4,7 +4,8 @@ This folder contains the cloud API foundation for Angel Smart Ads Manager. Googl
 
 ## Current implemented endpoints
 
-- `GET /health` — service health.\n- `POST /v1/angel/chat` — server-side Gemini proxy. The Gemini API key is read only from the server's `GEMINI_API_KEY` environment variable; the endpoint uses the configured primary/fallback models and a basic per-IP request limit.
+- `GET /health` — service health.
+- `POST /v1/angel/chat` — server-side Gemini proxy. The Gemini API key is read only from the server's `GEMINI_API_KEY` environment variable; the endpoint uses the configured primary/fallback models and a basic per-IP request limit.
 - `GET /v1/capabilities` — transparent provider/read/write readiness flags.
 - `POST /v1/analysis/campaign` — authenticated preliminary analysis of caller-supplied normalized metrics; clearly labels data source and never changes campaigns.
 - `GET /v1/monitoring/status` — reports monitoring as not operational until a scheduler and provider adapters are deployed.
