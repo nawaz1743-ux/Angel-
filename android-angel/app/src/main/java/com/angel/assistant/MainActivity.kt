@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
     private var isSpeakingState = mutableStateOf(false)
     private var transcriptState = mutableStateOf("")
     private var isFinalTranscriptState = mutableStateOf(false)
+    private var isHandsFreeEnabledState = mutableStateOf(false)
+    private var isProcessingState = mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -115,12 +117,24 @@ class MainActivity : ComponentActivity() {
             onTranscript = { text, isFinal ->
                 runOnUiThread {
                     transcriptState.value = text
-                    if (isFinal) isFinalTranscriptState.value = true
+                    if (isFinal) {
+                        isFinalTranscriptState.value = true
+                        if (isHandsFreeEnabledState.value && text.isNotBlank()) {
+                            // Hold the auto-listen loop while this final utterance is submitted.
+                            isProcessingState.value = true
+                        }
+                    }
                 }
             },
             onSpeakingStateChanged = { speaking ->
                 runOnUiThread {
                     isSpeakingState.value = speaking
+                    if (!speaking) isProcessingState.value = false
+                }
+            },
+            onRecognitionStateChanged = { listening ->
+                runOnUiThread {
+                    isListeningState.value = listening
                 }
             }
         )
@@ -200,9 +214,15 @@ class MainActivity : ComponentActivity() {
         val isSpeaking by isSpeakingState
         val transcript by transcriptState
         val isFinalTranscript by isFinalTranscriptState
+        val isHandsFreeEnabled by isHandsFreeEnabledState
+        val isProcessing by isProcessingState
 
         fun handleSendMessage(userText: String) {
-            if (userText.isBlank()) return
+            if (userText.isBlank()) {
+                isProcessingState.value = false
+                return
+            }
+            isProcessingState.value = true
 
             // Explicit multi-step commands are executed locally in order. Each step is
             // re-checked by the action router, including the finance-screen guard.
@@ -385,6 +405,17 @@ class MainActivity : ComponentActivity() {
         }
 
         fun handleMicToggle() {
+            // In Hands-Free mode the same mic control safely exits the continuous session.
+            if (isHandsFreeEnabledState.value) {
+                isHandsFreeEnabledState.value = false
+                voiceManager.stopListening()
+                isListeningState.value = false
+                isProcessingState.value = false
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                return
+            }
+
             if (isListening) {
                 // stopListening() returns before Android delivers the final recognition
                 // callback. Wait briefly for that callback instead of submitting a stale
@@ -430,6 +461,43 @@ class MainActivity : ComponentActivity() {
                 isFinalTranscriptState.value = false
                 voiceManager.startListening(currentLanguage)
                 isListeningState.value = true
+            }
+        }
+
+        // Hands-Free consumes each final transcript exactly once, submits it automatically,
+        // and waits until Angel has finished speaking before reopening the microphone.
+        LaunchedEffect(isHandsFreeEnabled, isFinalTranscript) {
+            if (isHandsFreeEnabled && isFinalTranscript) {
+                val spoken = transcriptState.value.trim()
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                if (spoken.isNotBlank()) {
+                    handleSendMessage(spoken)
+                } else {
+                    isProcessingState.value = false
+                }
+            }
+        }
+
+        LaunchedEffect(isHandsFreeEnabled, isListening, isProcessing, isSpeaking, currentScreen) {
+            if (isHandsFreeEnabled && currentScreen != Screen.CHAT) {
+                isHandsFreeEnabledState.value = false
+                voiceManager.stopListening()
+                isListeningState.value = false
+                isProcessingState.value = false
+                return@LaunchedEffect
+            }
+
+            if (isHandsFreeEnabled && currentScreen == Screen.CHAT &&
+                !isListening && !isProcessing && !isSpeaking
+            ) {
+                // Small cooldown prevents immediate restart while Android finalizes recognition/TTS.
+                delay(700L)
+                if (isHandsFreeEnabledState.value && currentScreen == Screen.CHAT &&
+                    !isListeningState.value && !isProcessingState.value && !isSpeakingState.value
+                ) {
+                    voiceManager.startListening(currentLanguage)
+                }
             }
         }
 
@@ -507,7 +575,24 @@ class MainActivity : ComponentActivity() {
                 },
                 onHandsFree = {
                     currentScreen = Screen.CHAT
-                    handleMicToggle()
+                    if (ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.RECORD_AUDIO
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        checkAndRequestPermissions()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sir, microphone permission allow karke Hands-Free dobara start karein.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        isHandsFreeEnabledState.value = true
+                        isProcessingState.value = false
+                        transcriptState.value = ""
+                        isFinalTranscriptState.value = false
+                        voiceManager.startListening(currentLanguage)
+                    }
                 },
                 onOpenReminders = {
                     productivityTab = ProductivityTab.REMINDERS
@@ -535,6 +620,8 @@ class MainActivity : ComponentActivity() {
                 language = currentLanguage,
                 isListening = isListening,
                 isSpeaking = isSpeaking,
+                isHandsFreeEnabled = isHandsFreeEnabled,
+                isProcessing = isProcessing,
                 transcript = transcript,
                 onSendMessage = {
                     handleSendMessage(it)
