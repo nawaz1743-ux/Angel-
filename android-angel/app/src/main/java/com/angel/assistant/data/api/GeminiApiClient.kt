@@ -26,25 +26,16 @@ class GeminiApiClient {
         .build()
 
     /*
-     * Only models intended for free-tier attempts are listed here.
-     * No paid-only fallback model is included.
+     * Model order requested by Shaan Sir:
+     * 1. Primary: Gemini 3.8 Flash
+     * 2. Only fallback: Gemini 3.5 Flash-Lite
      *
-     * Order requested by Shaan Sir:
-     * 1. Gemini 3.8 Flash
-     * 2. Gemini 3.5 Flash-Lite
-     * 3. Gemini 3.6 Flash
-     * 4. Gemini 3.1 Flash-Lite
-     * 5. Gemini 2.5 Flash
-     *
-     * Free access and quota must still be available
-     * for the user's Google AI Studio project.
+     * The fallback is attempted only if the primary request fails.
+     * Free-tier access and quota depend on the user's Google AI Studio project.
      */
     private val freeModelPriority = listOf(
         "gemini-3.8-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.6-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-2.5-flash"
+        "gemini-3.5-flash-lite"
     )
 
     suspend fun generateAngelResponse(
