@@ -15,11 +15,13 @@ import java.util.Locale
 class VoiceManager(
     private val context: Context,
     private val onTranscript: (String, Boolean) -> Unit,
-    private val onSpeakingStateChanged: (Boolean) -> Unit
+    private val onSpeakingStateChanged: (Boolean) -> Unit,
+    private val onRecognitionStateChanged: (Boolean) -> Unit
 ) : TextToSpeech.OnInitListener {
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
+    private var recognitionActive = false
     private var isTtsReady = false
 
     private var currentUtteranceId: String? = null
@@ -139,7 +141,11 @@ class VoiceManager(
     }
 
     fun startListening(language: AssistantLanguage) {
-        val recognizer = speechRecognizer ?: return
+        val recognizer = speechRecognizer ?: run {
+            onRecognitionStateChanged(false)
+            return
+        }
+        if (recognitionActive) return
 
         val intent = Intent(
             RecognizerIntent.ACTION_RECOGNIZE_SPEECH
@@ -163,13 +169,19 @@ class VoiceManager(
         }
 
         try {
+            recognitionActive = true
+            onRecognitionStateChanged(true)
             recognizer.startListening(intent)
         } catch (e: Exception) {
+            recognitionActive = false
+            onRecognitionStateChanged(false)
             Log.e(TAG, "startListening error: ${e.message}", e)
         }
     }
 
     fun stopListening() {
+        recognitionActive = false
+        onRecognitionStateChanged(false)
         try {
             speechRecognizer?.stopListening()
         } catch (e: Exception) {
@@ -186,6 +198,7 @@ class VoiceManager(
     ) {
         if (!isTtsReady) {
             Log.w(TAG, "TTS is not ready yet")
+            onSpeakingStateChanged(false)
             return
         }
 
@@ -453,6 +466,8 @@ class VoiceManager(
             override fun onEndOfSpeech() {}
 
             override fun onError(error: Int) {
+                recognitionActive = false
+                onRecognitionStateChanged(false)
                 Log.w(TAG, "Recognition error code: $error")
             }
 
@@ -461,7 +476,11 @@ class VoiceManager(
                     SpeechRecognizer.RESULTS_RECOGNITION
                 )
                 val text = matches?.firstOrNull() ?: ""
+                recognitionActive = false
+                // Deliver final text before marking recognition idle so Hands-Free cannot
+                // reopen the microphone in the gap between final recognition and submission.
                 onTranscript(text, true)
+                onRecognitionStateChanged(false)
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
