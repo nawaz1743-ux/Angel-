@@ -1,51 +1,48 @@
-# Angel Ads Cloud — extensible foundation
+# Angel Ads Cloud — live integration foundation
 
-This folder contains the cloud API foundation for Angel Smart Ads Manager. Google Ads and Meta Ads (Facebook + Instagram) are the first planned providers; the provider registry is extensible for future networks.
+This service provides the server-side API for Angel Smart Ads Manager. Provider passwords are never collected by Angel; OAuth takes place on the official Google or Meta login pages. Provider tokens are encrypted at rest and never returned to Android.
 
-## Current implemented endpoints
+## Endpoints
 
 - `GET /health` — service health.
-- `POST /v1/angel/chat` — server-side Gemini proxy. The Gemini API key is read only from the server's `GEMINI_API_KEY` environment variable; the endpoint uses the configured primary/fallback models and a basic per-IP request limit.
-- `GET /v1/capabilities` — transparent provider/read/write readiness flags.
-- `POST /v1/analysis/campaign` — authenticated preliminary analysis of caller-supplied normalized metrics; clearly labels data source and never changes campaigns.
-- `GET /v1/monitoring/status` — reports monitoring as not operational until a scheduler and provider adapters are deployed.
-- `POST /v1/approvals` — authenticated, durable draft-only proposal creation.
-- `GET /v1/approvals/{approval_id}` — authenticated retrieval of a stored proposal.
+- `GET /v1/capabilities` — reports configured integrations and write availability.
+- `GET /v1/ads/connect/google_ads` — authenticated; returns the official Google OAuth URL.
+- `GET /v1/ads/connect/meta_ads` — authenticated; returns the official Meta OAuth URL.
+- `GET /v1/ads/callback/{provider}` — OAuth redirect callback; discovers and stores accounts.
+- `GET /v1/ads/connections` — authenticated connected-account list.
+- `GET /v1/ads/connections/{connection_id}/campaigns` — authenticated live campaign metrics for the last 30 days.
+- `GET /v1/ads/monitoring/latest` — latest snapshots and monitoring mode.
+- `POST /v1/approvals` and `GET /v1/approvals/{approval_id}` — store and retrieve a proposal.
+- `POST /v1/ads/approvals/{approval_id}/decision` — records an explicit approve/reject decision. Approval does not yet execute provider mutations.
+- `POST /v1/analysis/campaign` — analyzes supplied metrics only; it does not fetch provider data or change campaigns.
+- `POST /v1/angel/chat` — server-side Gemini proxy.
 
-The campaign analysis endpoint computes CTR/CPC and cost per call when call tracking is marked configured, and offers cautious checks for missing conversion tracking and low CTR. It does not yet fetch live Google/Meta metrics; the caller must supply the metrics, and this rule-based output is not a guarantee of calls or ROI.
+## Required hosting configuration
 
-Approval proposals are persisted to SQLite using `DATABASE_URL`. They remain `pending_review`; there is no approve/execute endpoint and no live ad change is applied by this foundation.
+Set these as hosting secrets/environment variables; never commit them:
+- `ANGEL_ADS_API_KEY`: strong random secret used by the Android-to-cloud Ads API.
+- `ANGEL_TOKEN_ENCRYPTION_KEY`: Fernet key (generate with Python `Fernet.generate_key()`); losing it makes stored tokens unreadable.
+- `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_REDIRECT_URI`; optional `GOOGLE_ADS_LOGIN_CUSTOMER_ID`.
+- `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`.
+- `GEMINI_API_KEY` for Angel chat.
+- `MONITORING_ENABLED=true` to enable the in-process polling worker; optional `MONITORING_INTERVAL_SECONDS=1800`.
+- `DATABASE_URL=sqlite:///./angel_ads.db` for development only. Production needs durable persistent storage and a single scheduler worker; local ephemeral files are not suitable.
+
+Register the exact callback URLs in Google Cloud Console and Meta for Developers. Google Ads access requires a valid developer token and appropriate API access. Meta permissions may require App Review/business verification. Provider account discovery can fail until those approvals are granted.
+
+## Important current limitations
+
+- The backend now contains OAuth flows, encrypted token storage, and live read-only campaign-reporting adapters. They cannot work until deployed with valid credentials and the user completes the official OAuth flow.
+- The Android Smart Ads screen is not yet wired to these OAuth and campaign endpoints, so in-app connection buttons and account/campaign display still need implementation.
+- Monitoring snapshots run only when `MONITORING_ENABLED=true` and the service process is running. For reliable 24/7 monitoring, deploy a dedicated single worker with persistent storage and alert delivery.
+- Approval decisions are persisted, but live campaign mutations/publishing are **not enabled yet**. Provider-specific mutation adapters, an immutable audit trail, idempotency, and a second approval check immediately before writes must be completed and tested before enabling changes.
+- No campaign is changed by OAuth, reads, monitoring, drafts, or the approval-decision endpoint.
 
 ## Run locally
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-API docs are available at `/docs` while the service is running.
-
-## Deployment configuration
-
-Configure the service's environment variables in the hosting provider's secret/configuration settings. Set `GEMINI_API_KEY` there (never in Android BuildConfig or the APK), and set `ANGEL_ADS_API_KEY` separately for the Ads API. Deploy this service to a reliable HTTPS host first, then set the GitHub repository variable `ANGEL_AI_API_BASE_URL` to that HTTPS base URL so the Android build can route chat through this service. Do not commit real API keys, OAuth secrets, access tokens, refresh tokens, or customer data. Use HTTPS in production and persistent encrypted storage appropriate for production. The current draft database adapter supports SQLite only and is not sufficient by itself for a multi-user production service.
-
-## Required milestones before live use
-
-1. Deploy the service to a reliable HTTPS host with persistent storage, secrets, logs, and health monitoring.
-2. Implement provider OAuth authorization-code flows with signed state/CSRF protection, PKCE where supported, redirect URI validation, encrypted token storage, per-user account isolation, revocation, and audit logs.
-3. Implement Google Ads API and Meta Marketing API adapters using official APIs and least-privilege permissions; handle developer/app review and access requirements.
-4. Implement durable user-scoped approval records, expiring approvals, idempotency, and re-check approval immediately before each mutation. Do not perform writes from a suggestion or draft.
-5. Add a durable scheduler/worker, provider rate-limit handling, retry/backoff, timezone-aware alerts, monitoring, and cost limits. Respect provider quotas.
-6. Validate conversion tracking and normalize qualified calls, cost per qualified call, cost per lead, conversion rate, spend, and revenue where available.
-7. Test read-only first, then test approval-gated low-risk changes before enabling any production actions.
-
-## Safety and reliability
-
-- Users authorize through each provider's official login page; Angel must never collect provider passwords.
-- Never ship provider client secrets or long-lived tokens in the Android APK.
-- Treat campaign text and provider data as untrusted input.
-- AI suggestions are proposals, not guarantees of future results.
-- Alert or pause recommendations when tracking fails, spend is anomalous, metrics are missing, authentication expires, or provider APIs fail.
-- The user retains control of budgets and publishing; live changes require explicit, recorded approval.
+Do not use production customer data in local development. Keep secrets and tokens out of logs and Git.
