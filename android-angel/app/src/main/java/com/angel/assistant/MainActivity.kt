@@ -2,6 +2,9 @@ package com.angel.assistant
 
 import android.Manifest
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -66,6 +69,17 @@ class MainActivity : ComponentActivity() {
     private var isFinalTranscriptState = mutableStateOf(false)
     private var isHandsFreeEnabledState = mutableStateOf(false)
     private var isProcessingState = mutableStateOf(false)
+    private var isWakeWordEnabledState = mutableStateOf(false)
+
+    private val wakeWordReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == WakeWordService.ACTION_WAKEWORD_DETECTED &&
+                isWakeWordEnabledState.value && ::voiceManager.isInitialized
+            ) {
+                voiceManager.startListening(AssistantLanguage.HINGLISH)
+            }
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -112,6 +126,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        isWakeWordEnabledState.value = getSharedPreferences("angel_voice", MODE_PRIVATE)
+            .getBoolean("wake_word_enabled", false)
 
         voiceManager = VoiceManager(
             context = this,
@@ -233,6 +250,7 @@ class MainActivity : ComponentActivity() {
         val isFinalTranscript by isFinalTranscriptState
         val isHandsFreeEnabled by isHandsFreeEnabledState
         val isProcessing by isProcessingState
+        val isWakeWordEnabled by isWakeWordEnabledState
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) {
@@ -730,6 +748,36 @@ class MainActivity : ComponentActivity() {
 
             Screen.SETTINGS -> SettingsScreen(
                 currentLanguage = currentLanguage,
+                isWakeWordEnabled = isWakeWordEnabled,
+                onToggleWakeWord = { enabled ->
+                    if (enabled && ContextCompat.checkSelfPermission(
+                            this@MainActivity, Manifest.permission.RECORD_AUDIO
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        checkAndRequestPermissions()
+                        Toast.makeText(this@MainActivity, "Sir, microphone permission allow karke Wake-word dobara enable karein.", Toast.LENGTH_LONG).show()
+                    } else {
+                        isWakeWordEnabledState.value = enabled
+                        getSharedPreferences("angel_voice", MODE_PRIVATE).edit()
+                            .putBoolean("wake_word_enabled", enabled).apply()
+                        if (enabled) {
+                            try {
+                                ContextCompat.startForegroundService(
+                                    this@MainActivity,
+                                    Intent(this@MainActivity, WakeWordService::class.java)
+                                )
+                                Toast.makeText(this@MainActivity, "Hey Jarvis Wake-word enabled. Background listening notification active rahegi.", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                isWakeWordEnabledState.value = false
+                                getSharedPreferences("angel_voice", MODE_PRIVATE).edit().putBoolean("wake_word_enabled", false).apply()
+                                Toast.makeText(this@MainActivity, "Wake-word start nahi hua: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            stopService(Intent(this@MainActivity, WakeWordService::class.java))
+                            Toast.makeText(this@MainActivity, "Wake-word disabled.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
                 onSelectLanguage = {
                     currentLanguage = it
                 },
@@ -750,6 +798,41 @@ class MainActivity : ComponentActivity() {
                     currentScreen = Screen.MENU
                 }
             )
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter(WakeWordService.ACTION_WAKEWORD_DETECTED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(wakeWordReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(wakeWordReceiver, filter)
+        }
+        if (isWakeWordEnabledState.value &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ) {
+            try {
+                ContextCompat.startForegroundService(this, Intent(this, WakeWordService::class.java))
+            } catch (e: Exception) {
+                Toast.makeText(this, "Wake-word service restart nahi ho saka. Settings mein dobara enable karein.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    override fun onStop() {
+        try { unregisterReceiver(wakeWordReceiver) } catch (_: Exception) {}
+        super.onStop()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(WakeWordService.EXTRA_START_LISTENING, false) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ) {
+            window.decorView.postDelayed({ voiceManager.startListening(AssistantLanguage.HINGLISH) }, 500L)
         }
     }
 
