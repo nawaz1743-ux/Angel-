@@ -1,6 +1,7 @@
 package com.angel.assistant
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -485,6 +486,17 @@ class MainActivity : ComponentActivity() {
                 },
                 onOpenSettings = {
                     currentScreen = Screen.SETTINGS
+                },
+                onOpenDialer = {
+                    runCatching {
+                        startActivity(Intent(Intent.ACTION_DIAL))
+                    }.onFailure {
+                        Toast.makeText(
+                            this,
+                            "Phone dialer could not be opened.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 },
                 onInspectScreen = {
                     val screenText =
