@@ -11,9 +11,11 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
-val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY")
-    ?: System.getenv("GEMINI_API_KEY")
-    ?: ""
+val angelAiApiBaseUrl: String = (
+    localProperties.getProperty("ANGEL_AI_API_BASE_URL")
+        ?: System.getenv("ANGEL_AI_API_BASE_URL")
+        ?: ""
+    ).replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "com.angel.assistant"
@@ -28,7 +30,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "ANGEL_AI_API_BASE_URL", "\"$angelAiApiBaseUrl\"")
     }
 
     buildTypes {
@@ -40,7 +42,6 @@ android {
             )
         }
         debug {
-            buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
         }
     }
 
