@@ -7,11 +7,15 @@ import json
 import os
 import sqlite3
 import uuid
+import time
+from collections import defaultdict, deque
+from threading import Lock
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
+import httpx
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 
 from .providers.registry import ProviderConfig, ProviderRegistry
@@ -98,6 +102,143 @@ def _require_api_key(supplied: str | None) -> None:
         raise HTTPException(status_code=503, detail="Ads API is not configured by the deployment owner yet.")
     if not supplied or supplied != expected:
         raise HTTPException(status_code=401, detail="Invalid API authorization.")
+
+
+class AngelChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    role: StrictStr
+    text: StrictStr = Field(max_length=12000)
+
+
+class AngelChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    prompt: StrictStr = Field(min_length=1, max_length=12000)
+    history: list[AngelChatMessage] = Field(default_factory=list, max_length=8)
+    language: StrictStr = Field(default="hinglish", pattern="^(hinglish|english)$")
+
+
+# Small per-process guardrail. Production hosting should also enforce edge rate limits.
+_chat_rate_lock = Lock()
+_chat_requests_by_ip: dict[str, deque[float]] = defaultdict(deque)
+_CHAT_RATE_LIMIT = 20
+_CHAT_RATE_WINDOW_SECONDS = 60
+
+
+def _enforce_chat_rate_limit(client_ip: str) -> None:
+    now = time.monotonic()
+    with _chat_rate_lock:
+        recent = _chat_requests_by_ip[client_ip]
+        while recent and now - recent[0] >= _CHAT_RATE_WINDOW_SECONDS:
+            recent.popleft()
+        if len(recent) >= _CHAT_RATE_LIMIT:
+            raise HTTPException(status_code=429, detail="Angel AI request limit reached. Please wait and try again.")
+        recent.append(now)
+
+
+def _angel_system_instruction(language: str) -> str:
+    if language == "hinglish":
+        return (
+            "You are Angel, a helpful, intelligent, polite and caring personal AI assistant.\n\n"
+            "LANGUAGE RULES:\n"
+            "- Reply in natural Hinglish using Roman letters only.\n"
+            "- Never write Hindi in Devanagari script.\n"
+            "- If the user writes in English, reply in natural English.\n"
+            "- Address the user politely as Sir when appropriate.\n\n"
+            "RESPONSE RULES:\n"
+            "- Understand the user's actual question before answering.\n"
+            "- Give useful, specific and accurate answers.\n"
+            "- Do not repeat generic responses for unrelated questions.\n"
+            "- Admit uncertainty instead of inventing facts.\n"
+            "- Follow the conversation context provided to you.\n"
+            "- Keep answers clear and suitable for a mobile screen.\n"
+            "- Do not claim that you performed a phone action unless a tool actually performed that action."
+        )
+    return (
+        "You are Angel, a helpful, intelligent, polite and caring personal AI assistant.\n"
+        "Reply in natural English. Understand the actual question and give useful, specific answers.\n"
+        "Use conversation context when relevant. Do not invent facts or claim to have performed actions you did not perform.\n"
+        "Keep answers clear and suitable for a mobile screen."
+    )
+
+
+@app.post("/v1/angel/chat")
+async def angel_chat(payload: AngelChatRequest, request: Request) -> dict:
+    """Server-side Gemini proxy. The provider key stays in the hosting environment, never in the APK."""
+    client_ip = request.client.host if request.client else "unknown"
+    _enforce_chat_rate_limit(client_ip)
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Angel AI service is not configured by the server owner yet.")
+
+    if any(message.role not in {"user", "model"} for message in payload.history):
+        raise HTTPException(status_code=422, detail="Conversation history contains an unsupported role.")
+    if sum(len(message.text) for message in payload.history) > 24000:
+        raise HTTPException(status_code=422, detail="Conversation history is too long.")
+
+    contents = []
+    for message in payload.history:
+        if message.text.strip():
+            contents.append({"role": message.role, "parts": [{"text": message.text}]})
+    contents.append({"role": "user", "parts": [{"text": payload.prompt}]})
+
+    request_body = {
+        "contents": contents,
+        "systemInstruction": {"parts": [{"text": _angel_system_instruction(payload.language)}]},
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048},
+    }
+
+    last_status = 502
+    last_message = "The AI provider did not return a usable response."
+    async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=10.0)) as client:
+        for model in ("gemini-3.8-flash", "gemini-3.5-flash-lite"):
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            try:
+                response = await client.post(
+                    endpoint,
+                    headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                    json=request_body,
+                )
+            except httpx.HTTPError:
+                last_status = 502
+                last_message = "The AI provider could not be reached. Please try again."
+                continue
+
+            if response.is_success:
+                try:
+                    body = response.json()
+                    candidates = body.get("candidates") or []
+                    parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+                    answer = "\n".join(
+                        part.get("text", "") for part in parts
+                        if isinstance(part, dict) and isinstance(part.get("text"), str) and part.get("text").strip()
+                    ).strip()
+                except (ValueError, TypeError, IndexError, AttributeError):
+                    answer = ""
+                if answer:
+                    return {"text": answer, "model": model}
+                last_status = 502
+                last_message = "The AI provider returned an empty response."
+                continue
+
+            last_status = response.status_code
+            try:
+                error_body = response.json()
+                last_message = error_body.get("error", {}).get("message", "AI provider request failed.")
+            except (ValueError, AttributeError):
+                last_message = "AI provider request failed."
+
+            if response.status_code in {400, 401, 403} and "quota" not in last_message.lower() and "resource exhausted" not in last_message.lower() and response.status_code != 404:
+                break
+            if response.status_code not in {404, 429, 500, 502, 503, 504} and not (
+                response.status_code == 403 and any(term in last_message.lower() for term in ("quota", "rate limit", "resource exhausted"))
+            ):
+                break
+
+    # Avoid forwarding provider diagnostics that may contain implementation details.
+    if last_status == 429 or "quota" in last_message.lower() or "resource exhausted" in last_message.lower():
+        raise HTTPException(status_code=429, detail="Angel's configured Gemini models are temporarily unavailable or out of quota.")
+    raise HTTPException(status_code=502, detail="Angel could not get a response from the configured AI models. Please try again later.")
 
 
 @app.get("/health")
