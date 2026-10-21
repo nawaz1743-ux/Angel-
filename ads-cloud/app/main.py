@@ -161,6 +161,42 @@ def create_approval_draft(request: ApprovalRequest, x_angel_api_key: str | None 
     }
 
 
+@app.get("/v1/approvals")
+def list_approval_drafts(
+    limit: int = 50,
+    x_angel_api_key: str | None = Header(default=None),
+) -> dict:
+    """List saved proposals for review. Listing never approves or executes a change."""
+    _require_api_key(x_angel_api_key)
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 100.")
+    with _db() as connection:
+        rows = connection.execute(
+            """SELECT id, provider, account_ref, summary, proposed_change_json,
+                      estimated_risk, status, created_at
+               FROM approval_drafts ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return {
+        "approvals": [
+            {
+                "approval_id": row["id"],
+                "provider": row["provider"],
+                "account_ref": row["account_ref"],
+                "summary": row["summary"],
+                "proposed_change": json.loads(row["proposed_change_json"]),
+                "estimated_risk": row["estimated_risk"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "live_change_applied": False,
+            }
+            for row in rows
+        ],
+        "count": len(rows),
+        "live_changes_enabled": False,
+    }
+
+
 @app.get("/v1/approvals/{approval_id}")
 def get_approval_draft(approval_id: str, x_angel_api_key: str | None = Header(default=None)) -> dict:
     _require_api_key(x_angel_api_key)
