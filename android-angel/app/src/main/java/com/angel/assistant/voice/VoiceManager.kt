@@ -22,7 +22,10 @@ class VoiceManager(
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
+    // recognitionActive reflects the UI/listening phase; recognitionBusy remains true
+    // until Android delivers a terminal result/error, including after stopListening().
     private var recognitionActive = false
+    private var recognitionBusy = false
     private var isTtsReady = false
 
     private var currentUtteranceId: String? = null
@@ -147,6 +150,9 @@ class VoiceManager(
             return false
         }
         if (recognitionActive) return true
+        // Android SpeechRecognizer can still be finalizing a stopped session.
+        // Never call startListening again while that prior session is busy.
+        if (recognitionBusy) return false
 
         val intent = Intent(
             RecognizerIntent.ACTION_RECOGNIZE_SPEECH
@@ -171,11 +177,13 @@ class VoiceManager(
 
         return try {
             recognitionActive = true
+            recognitionBusy = true
             onRecognitionStateChanged(true)
             recognizer.startListening(intent)
             true
         } catch (e: Exception) {
             recognitionActive = false
+            recognitionBusy = false
             onRecognitionStateChanged(false)
             Log.e(TAG, "startListening error: ${e.message}", e)
             false
@@ -183,6 +191,8 @@ class VoiceManager(
     }
 
     fun stopListening() {
+        // Keep recognitionBusy set until Android confirms the session has ended.
+        // This prevents a second startListening call during SpeechRecognizer teardown.
         recognitionActive = false
         onRecognitionStateChanged(false)
         try {
@@ -470,6 +480,7 @@ class VoiceManager(
 
             override fun onError(error: Int) {
                 recognitionActive = false
+                recognitionBusy = false
                 onRecognitionStateChanged(false)
                 onRecognitionError(error)
                 Log.w(TAG, "Recognition error code: $error")
@@ -481,6 +492,7 @@ class VoiceManager(
                 )
                 val text = matches?.firstOrNull() ?: ""
                 recognitionActive = false
+                recognitionBusy = false
                 // Deliver final text before marking recognition idle so Hands-Free cannot
                 // reopen the microphone in the gap between final recognition and submission.
                 onTranscript(text, true)
