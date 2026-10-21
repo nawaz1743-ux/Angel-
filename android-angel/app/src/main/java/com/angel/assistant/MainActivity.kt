@@ -517,19 +517,32 @@ class MainActivity : ComponentActivity() {
             if (isHandsFreeEnabled && currentScreen == Screen.CHAT &&
                 !isListening && !isProcessing && !isSpeaking
             ) {
-                // Small cooldown prevents immediate restart while Android finalizes recognition/TTS.
+                // SpeechRecognizer often needs time to finish the previous session.
+                // Retry briefly instead of disabling Hands-Free on the first busy response.
                 delay(700L)
-                if (isHandsFreeEnabledState.value && currentScreen == Screen.CHAT &&
+                var started = false
+                for (attempt in 0 until 5) {
+                    if (!isHandsFreeEnabledState.value || currentScreen != Screen.CHAT ||
+                        isListeningState.value || isProcessingState.value || isSpeakingState.value
+                    ) {
+                        return@LaunchedEffect
+                    }
+                    if (voiceManager.startListening(currentLanguage)) {
+                        started = true
+                        break
+                    }
+                    delay(400L)
+                }
+                if (!started && isHandsFreeEnabledState.value && currentScreen == Screen.CHAT &&
                     !isListeningState.value && !isProcessingState.value && !isSpeakingState.value
                 ) {
-                    if (!voiceManager.startListening(currentLanguage)) {
-                        isHandsFreeEnabledState.value = false
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Sir, speech recognition restart nahi ho paayi. Hands-Free stop kar diya hai.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                    isHandsFreeEnabledState.value = false
+                    isProcessingState.value = false
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Sir, speech recognition baar-baar start nahi ho paayi. Google voice input aur microphone permission check karein.",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -622,16 +635,11 @@ class MainActivity : ComponentActivity() {
                     } else {
                         isHandsFreeEnabledState.value = true
                         isProcessingState.value = false
+                        isListeningState.value = false
                         transcriptState.value = ""
                         isFinalTranscriptState.value = false
-                        if (!voiceManager.startListening(currentLanguage)) {
-                            isHandsFreeEnabledState.value = false
-                            Toast.makeText(
-                                this@MainActivity,
-                                "Sir, is device par speech recognition start nahi ho paayi. Google voice input check karein.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+                        // Let the single Hands-Free effect start recognition. Starting here too
+                        // can race with Compose and create duplicate/busy recognizer sessions.
                     }
                 },
                 onOpenReminders = {
