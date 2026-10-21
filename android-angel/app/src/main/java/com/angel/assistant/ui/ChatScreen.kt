@@ -67,6 +67,8 @@ fun ChatScreen(
     language: AssistantLanguage,
     isListening: Boolean,
     isSpeaking: Boolean,
+    isHandsFreeEnabled: Boolean,
+    isProcessing: Boolean,
     transcript: String,
     onSendMessage: (String) -> Unit,
     onMicClick: () -> Unit,
@@ -160,8 +162,12 @@ fun ChatScreen(
 
             Text(
                 text = when {
+                    isListening && isHandsFreeEnabled -> "Hands-Free • Listening"
                     isListening -> "Listening"
+                    isProcessing && !isSpeaking -> "Thinking"
+                    isSpeaking && isHandsFreeEnabled -> "Hands-Free • Speaking"
                     isSpeaking -> "Speaking"
+                    isHandsFreeEnabled -> "Hands-Free • Ready"
                     else -> "Online"
                 },
                 fontSize = 10.sp,
