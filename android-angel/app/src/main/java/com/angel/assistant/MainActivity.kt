@@ -137,6 +137,22 @@ class MainActivity : ComponentActivity() {
                 runOnUiThread {
                     isListeningState.value = listening
                 }
+            },
+            onRecognitionError = { error ->
+                runOnUiThread {
+                    isListeningState.value = false
+                    val recoverable = error == android.speech.SpeechRecognizer.ERROR_NO_MATCH ||
+                        error == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                    if (isHandsFreeEnabledState.value && !recoverable) {
+                        isHandsFreeEnabledState.value = false
+                        isProcessingState.value = false
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sir, voice recognition service mein problem aayi. Hands-Free ruk gaya hai; mic dobara try karein.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             }
         )
 
@@ -460,8 +476,13 @@ class MainActivity : ComponentActivity() {
 
                 transcriptState.value = ""
                 isFinalTranscriptState.value = false
-                voiceManager.startListening(currentLanguage)
-                isListeningState.value = true
+                if (!voiceManager.startListening(currentLanguage)) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Sir, speech recognition start nahi ho paayi. Google voice input check karein.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
 
@@ -497,7 +518,14 @@ class MainActivity : ComponentActivity() {
                 if (isHandsFreeEnabledState.value && currentScreen == Screen.CHAT &&
                     !isListeningState.value && !isProcessingState.value && !isSpeakingState.value
                 ) {
-                    voiceManager.startListening(currentLanguage)
+                    if (!voiceManager.startListening(currentLanguage)) {
+                        isHandsFreeEnabledState.value = false
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sir, speech recognition restart nahi ho paayi. Hands-Free stop kar diya hai.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         }
@@ -592,7 +620,14 @@ class MainActivity : ComponentActivity() {
                         isProcessingState.value = false
                         transcriptState.value = ""
                         isFinalTranscriptState.value = false
-                        voiceManager.startListening(currentLanguage)
+                        if (!voiceManager.startListening(currentLanguage)) {
+                            isHandsFreeEnabledState.value = false
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Sir, is device par speech recognition start nahi ho paayi. Google voice input check karein.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 },
                 onOpenReminders = {
