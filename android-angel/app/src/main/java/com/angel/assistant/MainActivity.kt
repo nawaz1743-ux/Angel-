@@ -391,11 +391,15 @@ class MainActivity : ComponentActivity() {
             )
 
             scope.launch {
-                val response = geminiClient.generateAngelResponse(
-                    prompt = userText,
-                    history = messages,
-                    language = currentLanguage
-                )
+                val response = try {
+                    geminiClient.generateAngelResponse(
+                        prompt = userText,
+                        history = messages,
+                        language = currentLanguage
+                    )
+                } catch (_: Exception) {
+                    "Sir, abhi response connect nahi ho saka. Internet connection check karke dobara try karein."
+                }
 
                 messages.add(
                     ChatMessage(
