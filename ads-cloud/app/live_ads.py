@@ -4,7 +4,9 @@ Secrets and OAuth tokens stay on the server. Live mutations are deliberately
 not exposed by this module until a provider-specific, audited execution adapter
 is configured and tested.
 """
+import asyncio
 import base64
+import logging
 import hashlib
 import hmac
 import json
@@ -326,3 +328,39 @@ def decide_approval(approval_id: str, payload: ApprovalDecision,
         db.execute("UPDATE approval_drafts SET status=? WHERE id=?", (status, approval_id))
     return {"approval_id": approval_id, "status": status, "live_change_applied": False,
             "message": "Decision recorded. Live publishing is intentionally not enabled until audited provider-specific mutation adapters are deployed."}
+
+
+_monitor_logger = logging.getLogger("angel.ads.monitoring")
+
+
+async def _monitoring_loop() -> None:
+    interval = max(300, int(_env("MONITORING_INTERVAL_SECONDS") or "1800"))
+    while True:
+        try:
+            if _env("MONITORING_ENABLED").lower() == "true":
+                _ensure_tables()
+                with _db() as db:
+                    rows = db.execute("SELECT id FROM ads_connections").fetchall()
+                for item in rows:
+                    try:
+                        row, token = _get_connection(item["id"])
+                        campaigns = await (_google_campaigns(row["external_account_id"], token)
+                                          if row["provider"] == "google_ads"
+                                          else _meta_campaigns(row["external_account_id"], token))
+                        now = datetime.now(timezone.utc).isoformat()
+                        with _db() as db:
+                            db.execute("INSERT INTO ads_monitor_snapshots(connection_id,fetched_at,metrics_json) VALUES(?,?,?)",
+                                       (row["id"], now, json.dumps(campaigns)))
+                    except Exception as exc:
+                        _monitor_logger.warning("Monitoring fetch failed for connection %s: %s", item["id"], type(exc).__name__)
+        except Exception as exc:
+            _monitor_logger.warning("Monitoring loop iteration failed: %s", type(exc).__name__)
+        await asyncio.sleep(interval)
+
+
+@router.on_event("startup")
+async def start_monitoring_worker() -> None:
+    # For multi-worker deployments, run exactly one worker/scheduler instance.
+    # Set MONITORING_ENABLED=true only after deploying durable storage and alerts.
+    if _env("MONITORING_ENABLED").lower() == "true":
+        asyncio.create_task(_monitoring_loop())
