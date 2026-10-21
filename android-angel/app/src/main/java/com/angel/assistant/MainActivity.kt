@@ -1,6 +1,7 @@
 package com.angel.assistant
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -31,6 +32,8 @@ import com.angel.assistant.ui.ApprovalScreen
 import com.angel.assistant.ui.ChatScreen
 import com.angel.assistant.ui.HomeScreen
 import com.angel.assistant.ui.MenuScreen
+import com.angel.assistant.ui.ProductivityScreen
+import com.angel.assistant.ui.ProductivityTab
 import com.angel.assistant.ui.SettingsScreen
 import com.angel.assistant.ui.SmartAdsManagerScreen
 import com.angel.assistant.voice.VoiceManager
@@ -44,7 +47,8 @@ enum class Screen {
     CHAT,
     APPROVALS,
     SMART_ADS,
-    SETTINGS
+    SETTINGS,
+    PRODUCTIVITY
 }
 
 class MainActivity : ComponentActivity() {
@@ -167,6 +171,7 @@ class MainActivity : ComponentActivity() {
         var currentLanguage by remember {
             mutableStateOf(AssistantLanguage.HINGLISH)
         }
+        var productivityTab by remember { mutableStateOf(ProductivityTab.REMINDERS) }
 
         val scope = rememberCoroutineScope()
 
@@ -174,7 +179,7 @@ class MainActivity : ComponentActivity() {
             currentScreen = when (currentScreen) {
                 Screen.MENU -> Screen.HOME
                 Screen.CHAT -> Screen.HOME
-                Screen.SETTINGS, Screen.SMART_ADS, Screen.APPROVALS -> Screen.MENU
+                Screen.SETTINGS, Screen.SMART_ADS, Screen.APPROVALS, Screen.PRODUCTIVITY -> Screen.MENU
                 Screen.HOME -> Screen.HOME
             }
         }
@@ -503,6 +508,25 @@ class MainActivity : ComponentActivity() {
                 onHandsFree = {
                     currentScreen = Screen.CHAT
                     handleMicToggle()
+                },
+                onOpenReminders = {
+                    productivityTab = ProductivityTab.REMINDERS
+                    currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenTasks = {
+                    productivityTab = ProductivityTab.TASKS
+                    currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenTodo = {
+                    productivityTab = ProductivityTab.TODO
+                    currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenDialer = {
+                    try {
+                        startActivity(Intent(Intent.ACTION_DIAL))
+                    } catch (_: Exception) {
+                        Toast.makeText(this@MainActivity, "Phone dialer open nahi ho saka.", Toast.LENGTH_LONG).show()
+                    }
                 }
             )
 
@@ -562,6 +586,11 @@ class MainActivity : ComponentActivity() {
                 onBack = {
                     currentScreen = Screen.MENU
                 }
+            )
+
+            Screen.PRODUCTIVITY -> ProductivityScreen(
+                initialTab = productivityTab,
+                onBack = { currentScreen = Screen.MENU }
             )
 
             Screen.SETTINGS -> SettingsScreen(
