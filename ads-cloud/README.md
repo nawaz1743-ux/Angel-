@@ -5,6 +5,7 @@ This folder contains the cloud API foundation for Angel Smart Ads Manager. Googl
 ## Current implemented endpoints
 
 - `GET /health` — service health.
+- `POST /v1/angel/chat` — server-side Gemini proxy. The Gemini API key is read only from the server's `GEMINI_API_KEY` environment variable; the endpoint uses the configured primary/fallback models and a basic per-IP request limit.
 - `GET /v1/capabilities` — transparent provider/read/write readiness flags.
 - `POST /v1/analysis/campaign` — authenticated preliminary analysis of caller-supplied normalized metrics; clearly labels data source and never changes campaigns.
 - `GET /v1/monitoring/status` — reports monitoring as not operational until a scheduler and provider adapters are deployed.
@@ -28,7 +29,7 @@ API docs are available at `/docs` while the service is running.
 
 ## Deployment configuration
 
-Copy `.env.example` to the deployment environment and configure secrets there. Never commit real OAuth secrets, API keys, access tokens, refresh tokens, or customer data. Set a strong `ANGEL_ADS_API_KEY` in the hosting provider's secret store. Use HTTPS in production and a persistent encrypted database/storage setup appropriate for production. The current draft database adapter supports SQLite only and is not sufficient by itself for a multi-user production service.
+Configure the service's environment variables in the hosting provider's secret/configuration settings. Set `GEMINI_API_KEY` there (never in Android BuildConfig or the APK), and set `ANGEL_ADS_API_KEY` separately for the Ads API. Deploy this service to a reliable HTTPS host first, then set the GitHub repository variable `ANGEL_AI_API_BASE_URL` to that HTTPS base URL so the Android build can route chat through this service. Do not commit real API keys, OAuth secrets, access tokens, refresh tokens, or customer data. Use HTTPS in production and persistent encrypted storage appropriate for production. The current draft database adapter supports SQLite only and is not sufficient by itself for a multi-user production service.
 
 ## Required milestones before live use
 

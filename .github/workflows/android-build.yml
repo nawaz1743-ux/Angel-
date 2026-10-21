@@ -42,7 +42,7 @@ jobs:
       - name: Build Angel APK
         working-directory: android-angel
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANGEL_AI_API_BASE_URL: ${{ vars.ANGEL_AI_API_BASE_URL }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug
