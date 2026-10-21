@@ -57,7 +57,10 @@ fun MenuScreen(
     onOpenSmartAds: () -> Unit,
     onOpenSettings: () -> Unit,
     onInspectScreen: () -> Unit,
-    onHandsFree: () -> Unit
+    onHandsFree: () -> Unit,
+    onOpenReminders: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTodo: () -> Unit
 ) {
     val menuItems = listOf(
         AngelMenuItem(
@@ -82,7 +85,7 @@ fun MenuScreen(
             "Reminders & Alarms",
             "Reminders aur alarms",
             Icons.Default.Alarm,
-            {}
+            onOpenReminders
         ),
         AngelMenuItem(
             "Call Dialer",
@@ -94,13 +97,13 @@ fun MenuScreen(
             "Task Manager",
             "Apne tasks manage karein",
             Icons.Default.Assignment,
-            {}
+            onOpenTasks
         ),
         AngelMenuItem(
             "To-do List",
             "Daily tasks ki list",
             Icons.Default.NoteAlt,
-            {}
+            onOpenTodo
         ),
         AngelMenuItem(
             "Writing Assistant",
