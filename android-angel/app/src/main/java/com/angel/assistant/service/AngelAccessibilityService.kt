@@ -422,7 +422,15 @@ class AngelAccessibilityService : AccessibilityService() {
         }
 
         val root = rootInActiveWindow
-        if (root == null || root.packageName?.toString()?.lowercase() != eventPackage) {
+        if (root == null) {
+            clearExternalSnapshot()
+            return
+        }
+        val rootPackage = root.packageName?.toString()?.lowercase().orEmpty()
+        // Ignore delayed events from the app Angel just left; preserve its fresh
+        // snapshot when Angel is already the active window.
+        if (rootPackage == packageName.lowercase()) return
+        if (rootPackage != eventPackage) {
             clearExternalSnapshot()
             return
         }
