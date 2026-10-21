@@ -102,28 +102,55 @@ class AngelAccessibilityService : AccessibilityService() {
 
         fun captureVisibleScreenText(): String {
             val service = activeServiceInstance
-                ?: return "Accessibility Service is not enabled by user."
-            if (isSensitiveFinanceScreen(service)) {
-                return "Screen reading paused for a banking or payment app."
-            }
+                ?: return "Accessibility Service is not enabled by user. Enable Angel in Android Accessibility settings and try again."
+
             val rootNode = service.rootInActiveWindow
-            val activePackage = rootNode?.packageName?.toString().orEmpty()
-            // Returning to Angel changes the active window, so use the transient
-            // snapshot from the last external app only when explicitly requested.
-            if (activePackage == service.packageName && lastExternalScreenText.isNotBlank()) {
+                ?: return "No active window content is available. Open WhatsApp, Chrome, or another supported app, then try again. If this continues, check Angel's Accessibility permission."
+
+            val activePackage = rootNode.packageName?.toString()?.lowercase().orEmpty()
+            if (activePackage.isBlank()) {
+                clearExternalSnapshot()
+                return "The foreground app could not be identified. Screen reading is paused for safety."
+            }
+
+            if (isSensitiveFinanceScreen(service)) {
+                clearExternalSnapshot()
+                return "Screen reading is paused for a banking or payment screen."
+            }
+
+            // When Angel is foreground, use only the recent in-memory snapshot from
+            // the app the user just left. Never substitute stale text from another app.
+            if (activePackage == service.packageName.lowercase()) {
                 val age = System.currentTimeMillis() - lastExternalCapturedAtMillis
-                if (age in 0..SCREEN_SNAPSHOT_TTL_MS &&
+                if (lastExternalPackage != null &&
+                    lastExternalScreenText.isNotBlank() &&
+                    age in 0..SCREEN_SNAPSHOT_TTL_MS &&
                     !containsSensitiveFinanceText(lastExternalScreenText)
                 ) {
-                    return "Previous app: " + (lastExternalPackage ?: "unknown") + "\n" + lastExternalScreenText
+                    return "Previous app: $lastExternalPackage\n$lastExternalScreenText"
                 }
                 clearExternalSnapshot()
-                return "Previous screen text expired or was blocked for finance safety. Open the app again and request screen reading."
+                return "No recent readable screen text is available. Open the app you want Angel to read, wait for its screen to load, then return to Angel and try again."
             }
-            if (rootNode == null) return "No active window content accessible."
+
+            // If the user requests reading while another app is still foreground,
+            // read that current window and refresh the short-lived snapshot.
             val builder = StringBuilder()
             extractNodeTextRecursive(rootNode, builder, 0)
-            return if (builder.isBlank()) "No readable text detected on screen." else builder.toString()
+            val snapshot = builder.toString().trim()
+            if (snapshot.isBlank()) {
+                clearExternalSnapshot()
+                return "No readable text was exposed by $activePackage. Some app screens do not allow accessibility text reading."
+            }
+            if (containsSensitiveFinanceText(snapshot)) {
+                clearExternalSnapshot()
+                return "Screen reading is paused because this screen appears to contain banking or payment information."
+            }
+
+            lastExternalPackage = activePackage
+            lastExternalScreenText = snapshot.take(12000)
+            lastExternalCapturedAtMillis = System.currentTimeMillis()
+            return "Current app: $activePackage\n$lastExternalScreenText"
         }
 
         /** Scrolls the current app's first available scrollable container. */
@@ -376,35 +403,44 @@ class AngelAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Screen events never trigger actions. Keep a short-lived text snapshot so
-        // the user can return to Angel and explicitly request "read screen".
+        // Keep only a short-lived in-memory snapshot for the explicit "read screen"
+        // action. Never cache recognized finance/payment screens or mix apps.
         val eventPackage = event?.packageName?.toString()?.lowercase().orEmpty()
         if (eventPackage.isBlank()) return
+
         if (sensitivePackageHints.any { eventPackage.contains(it) }) {
             clearExternalSnapshot()
             return
         }
+
+        // Preserve the last external snapshot while Angel is foreground so the
+        // user can explicitly ask Angel to read the app they just left.
         if (eventPackage == packageName.lowercase()) return
-        // Never carry one app's text into a different external app.
+
         if (lastExternalPackage != null && lastExternalPackage != eventPackage) {
             clearExternalSnapshot()
         }
-        val root = rootInActiveWindow ?: return
-        if (root.packageName?.toString()?.lowercase() != eventPackage) return
-        val builder = StringBuilder()
-        extractNodeTextRecursive(root, builder, 0)
-        val snapshot = builder.toString().trim()
-        // Some payment flows run inside browsers or non-bank apps. Detect strong
-        // sensitive-screen text markers before caching any content from that window.
-        if (containsSensitiveFinanceText(snapshot)) {
+
+        val root = rootInActiveWindow
+        if (root == null || root.packageName?.toString()?.lowercase() != eventPackage) {
             clearExternalSnapshot()
             return
         }
-        if (snapshot.isNotBlank()) {
-            lastExternalPackage = eventPackage
-            lastExternalScreenText = snapshot.take(12000)
-            lastExternalCapturedAtMillis = System.currentTimeMillis()
+
+        val builder = StringBuilder()
+        extractNodeTextRecursive(root, builder, 0)
+        val snapshot = builder.toString().trim()
+
+        // Some payment flows run inside browsers or non-bank apps. Check the
+        // visible text before retaining any part of the screen in memory.
+        if (snapshot.isBlank() || containsSensitiveFinanceText(snapshot)) {
+            clearExternalSnapshot()
+            return
         }
+
+        lastExternalPackage = eventPackage
+        lastExternalScreenText = snapshot.take(12000)
+        lastExternalCapturedAtMillis = System.currentTimeMillis()
     }
 
     override fun onInterrupt() {
