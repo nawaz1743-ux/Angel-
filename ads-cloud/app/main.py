@@ -252,13 +252,13 @@ def capabilities() -> dict:
     return {
         "platforms": [
             {"key": p.key, "name": p.display_name, "configured": p.configured,
-             "supports_read": False, "supports_drafts": True, "supports_write": False}
+             "supports_read": p.configured, "supports_drafts": True, "supports_write": False}
             for p in providers
         ],
         "future_platforms_supported": True,
-        "live_account_connections_implemented": False,
+        "live_account_connections_implemented": True,
         "live_campaign_writes_enabled": False,
-        "monitoring_worker_deployed": False,
+        "monitoring_worker_deployed": os.getenv("MONITORING_ENABLED", "false").lower() == "true",
     }
 
 
@@ -266,8 +266,8 @@ def capabilities() -> dict:
 def monitoring_status() -> dict:
     return {
         "requested_enabled": os.getenv("MONITORING_ENABLED", "false").lower() == "true",
-        "operational": False,
-        "reason": "A deployed scheduler, OAuth connections, and live provider metrics adapters are not implemented yet.",
+        "operational": os.getenv("MONITORING_ENABLED", "false").lower() == "true",
+        "reason": "In-process scheduled snapshots are enabled only when MONITORING_ENABLED=true; a single worker and persistent production storage are required.",
         "default_interval_minutes": 30,
         "approval_required_for_campaign_changes": True,
     }
