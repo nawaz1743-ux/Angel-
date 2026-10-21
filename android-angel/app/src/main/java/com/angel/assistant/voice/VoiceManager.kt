@@ -169,7 +169,7 @@ class VoiceManager(
             )
         }
 
-        try {
+        return try {
             recognitionActive = true
             onRecognitionStateChanged(true)
             recognizer.startListening(intent)
