@@ -60,7 +60,8 @@ fun MenuScreen(
     onHandsFree: () -> Unit,
     onOpenReminders: () -> Unit,
     onOpenTasks: () -> Unit,
-    onOpenTodo: () -> Unit
+    onOpenTodo: () -> Unit,
+    onOpenDialer: () -> Unit
 ) {
     val menuItems = listOf(
         AngelMenuItem(
@@ -91,7 +92,7 @@ fun MenuScreen(
             "Call Dialer",
             "Phone dialer kholein",
             Icons.Default.Contacts,
-            {}
+            onOpenDialer
         ),
         AngelMenuItem(
             "Task Manager",
