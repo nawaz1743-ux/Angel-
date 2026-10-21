@@ -15,14 +15,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Card
@@ -93,18 +91,6 @@ fun MenuScreen(
             "Phone dialer kholein",
             Icons.Default.Contacts,
             onOpenDialer
-        ),
-        AngelMenuItem(
-            "Task Manager",
-            "Apne tasks manage karein",
-            Icons.Default.Assignment,
-            onOpenTasks
-        ),
-        AngelMenuItem(
-            "To-do List",
-            "Daily tasks ki list",
-            Icons.Default.NoteAlt,
-            onOpenTodo
         ),
         AngelMenuItem(
             "Writing Assistant",
