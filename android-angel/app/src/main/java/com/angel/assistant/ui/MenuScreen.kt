@@ -56,6 +56,7 @@ fun MenuScreen(
     onOpenApprovals: () -> Unit,
     onOpenSmartAds: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDialer: () -> Unit,
     onInspectScreen: () -> Unit,
     onHandsFree: () -> Unit
 ) {
@@ -88,7 +89,7 @@ fun MenuScreen(
             "Call Dialer",
             "Phone dialer kholein",
             Icons.Default.Contacts,
-            {}
+            onOpenDialer
         ),
         AngelMenuItem(
             "Task Manager",
