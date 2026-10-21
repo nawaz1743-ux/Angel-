@@ -1,6 +1,7 @@
 package com.angel.assistant
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -512,6 +513,13 @@ class MainActivity : ComponentActivity() {
                 onOpenTodo = {
                     productivityTab = ProductivityTab.TODO
                     currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenDialer = {
+                    runCatching {
+                        startActivity(Intent(Intent.ACTION_DIAL))
+                    }.onFailure {
+                        Toast.makeText(this@MainActivity, "Phone dialer open nahi ho saka.", Toast.LENGTH_LONG).show()
+                    }
                 }
             )
 
