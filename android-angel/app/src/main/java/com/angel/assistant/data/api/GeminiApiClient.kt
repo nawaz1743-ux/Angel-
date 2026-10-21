@@ -19,6 +19,10 @@ import java.util.concurrent.TimeUnit
 
 class GeminiApiClient {
 
+    @Volatile
+    var lastUsedModel: String? = null
+        private set
+
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
@@ -95,7 +99,14 @@ class GeminiApiClient {
 
         // Keep recent conversation context.
         // Gemini expects alternating user/model messages.
-        val recentHistory = history
+        // MainActivity already appended the current prompt to history.
+        // Remove that final user entry because prompt is added separately below.
+        val historyWithoutCurrentPrompt = if (
+            history.lastOrNull()?.isFromUser == true &&
+            history.lastOrNull()?.text?.trim() == prompt.trim()
+        ) history.dropLast(1) else history
+
+        val recentHistory = historyWithoutCurrentPrompt
             .takeLast(8)
             .filter { it.text.isNotBlank() }
 
@@ -155,8 +166,11 @@ class GeminiApiClient {
         var lastErrorMessage = ""
         var quotaOrTemporaryFailureSeen = false
 
+        val totalStartNanos = System.nanoTime()
+
         for (model in freeModelPriority) {
 
+            val modelStartNanos = System.nanoTime()
             try {
                 val endpoint =
                     "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -222,9 +236,17 @@ class GeminiApiClient {
                         val answer = textBuilder.toString().trim()
 
                         if (answer.isNotBlank()) {
+                            lastUsedModel = model
+                            val modelElapsedMs = TimeUnit.NANOSECONDS.toMillis(
+                                System.nanoTime() - modelStartNanos
+                            )
+                            val totalElapsedMs = TimeUnit.NANOSECONDS.toMillis(
+                                System.nanoTime() - totalStartNanos
+                            )
                             Log.i(
                                 "GeminiApiClient",
-                                "Response generated using $model"
+                                "Response generated using $model; model=" + modelElapsedMs +
+                                    "ms; total=" + totalElapsedMs + "ms"
                             )
                             return@withContext answer
                         }
@@ -345,9 +367,12 @@ class GeminiApiClient {
                 lastErrorMessage =
                     "${e.javaClass.simpleName}: ${e.message.orEmpty()}"
 
+                val modelElapsedMs = TimeUnit.NANOSECONDS.toMillis(
+                    System.nanoTime() - modelStartNanos
+                )
                 Log.w(
                     "GeminiApiClient",
-                    "$model request failed: $lastErrorMessage"
+                    "$model request failed after " + modelElapsedMs + "ms: " + lastErrorMessage
                 )
 
                 // A network timeout may be temporary.
@@ -357,6 +382,10 @@ class GeminiApiClient {
         }
 
         // Every configured free model attempt failed.
+        val totalElapsedMs = TimeUnit.NANOSECONDS.toMillis(
+            System.nanoTime() - totalStartNanos
+        )
+        Log.w("GeminiApiClient", "All configured models failed; total=" + totalElapsedMs + "ms")
         if (quotaOrTemporaryFailureSeen) {
             localMessage(
                 language,
