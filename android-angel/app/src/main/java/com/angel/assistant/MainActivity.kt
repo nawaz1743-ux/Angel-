@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -164,6 +165,15 @@ class MainActivity : ComponentActivity() {
         }
 
         val scope = rememberCoroutineScope()
+
+        BackHandler(enabled = currentScreen != Screen.HOME) {
+            currentScreen = when (currentScreen) {
+                Screen.MENU -> Screen.HOME
+                Screen.CHAT -> Screen.HOME
+                Screen.SETTINGS, Screen.SMART_ADS, Screen.APPROVALS -> Screen.MENU
+                Screen.HOME -> Screen.HOME
+            }
+        }
 
         val messages = remember {
             mutableStateListOf(
@@ -437,9 +447,6 @@ class MainActivity : ComponentActivity() {
             )
 
             Screen.MENU -> MenuScreen(
-                onBack = {
-                    currentScreen = Screen.HOME
-                },
                 onOpenChat = {
                     currentScreen = Screen.CHAT
                 },
@@ -465,6 +472,9 @@ class MainActivity : ComponentActivity() {
                     )
 
                     currentScreen = Screen.CHAT
+                },
+                onHandsFree = {
+                    handleMicToggle()
                 }
             )
 
