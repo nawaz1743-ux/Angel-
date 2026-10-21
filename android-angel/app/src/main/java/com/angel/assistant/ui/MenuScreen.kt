@@ -13,26 +13,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Contacts
+import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,12 +52,12 @@ data class AngelMenuItem(
 
 @Composable
 fun MenuScreen(
-    onBack: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenApprovals: () -> Unit,
     onOpenSmartAds: () -> Unit,
     onOpenSettings: () -> Unit,
-    onInspectScreen: () -> Unit
+    onInspectScreen: () -> Unit,
+    onHandsFree: () -> Unit
 ) {
     val menuItems = listOf(
         AngelMenuItem(
@@ -68,6 +65,12 @@ fun MenuScreen(
             "Angel se baat karein",
             Icons.Default.Chat,
             onOpenChat
+        ),
+        AngelMenuItem(
+            "Voice Input / Hands-Free",
+            "Mic se voice interaction shuru ya band karein",
+            Icons.Default.Headset,
+            onHandsFree
         ),
         AngelMenuItem(
             "Screen Understanding",
@@ -118,22 +121,10 @@ fun MenuScreen(
             onOpenChat
         ),
         AngelMenuItem(
-            "Voice & Animation",
-            "Voice aur animation settings",
-            Icons.Default.VolumeUp,
-            onOpenSettings
-        ),
-        AngelMenuItem(
             "Smart Ads Manager",
             "Google Ads aur Facebook/Instagram Ads ke plans, drafts aur analysis",
             Icons.Default.Campaign,
             onOpenSmartAds
-        ),
-        AngelMenuItem(
-            "Ads Approvals",
-            "Pending approvals dekhein",
-            Icons.Default.Campaign,
-            onOpenApprovals
         ),
         AngelMenuItem(
             "App Settings",
@@ -150,31 +141,18 @@ fun MenuScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Slate100
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "ANGEL AI",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Slate100,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = "YOUR PERSONAL AI",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = CyanAccent
-                )
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "ANGEL AI",
+                style = MaterialTheme.typography.titleLarge,
+                color = Slate100,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                text = "YOUR PERSONAL AI",
+                style = MaterialTheme.typography.labelSmall,
+                color = CyanAccent
+            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -236,11 +214,6 @@ fun MenuScreen(
             }
         }
 
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        ) {
-            Text("Back to Home", color = CyanAccent)
-        }
+        // Use the Android system Back button to leave the Menu.
     }
 }
