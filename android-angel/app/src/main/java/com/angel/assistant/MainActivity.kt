@@ -1,6 +1,7 @@
 package com.angel.assistant
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -31,6 +33,8 @@ import com.angel.assistant.ui.ApprovalScreen
 import com.angel.assistant.ui.ChatScreen
 import com.angel.assistant.ui.HomeScreen
 import com.angel.assistant.ui.MenuScreen
+import com.angel.assistant.ui.ProductivityScreen
+import com.angel.assistant.ui.ProductivityTab
 import com.angel.assistant.ui.SettingsScreen
 import com.angel.assistant.ui.SmartAdsManagerScreen
 import com.angel.assistant.voice.VoiceManager
@@ -44,7 +48,8 @@ enum class Screen {
     CHAT,
     APPROVALS,
     SMART_ADS,
-    SETTINGS
+    SETTINGS,
+    PRODUCTIVITY
 }
 
 class MainActivity : ComponentActivity() {
@@ -59,6 +64,8 @@ class MainActivity : ComponentActivity() {
     private var isSpeakingState = mutableStateOf(false)
     private var transcriptState = mutableStateOf("")
     private var isFinalTranscriptState = mutableStateOf(false)
+    private var isHandsFreeEnabledState = mutableStateOf(false)
+    private var isProcessingState = mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -111,12 +118,40 @@ class MainActivity : ComponentActivity() {
             onTranscript = { text, isFinal ->
                 runOnUiThread {
                     transcriptState.value = text
-                    if (isFinal) isFinalTranscriptState.value = true
+                    if (isFinal) {
+                        isFinalTranscriptState.value = true
+                        if (isHandsFreeEnabledState.value && text.isNotBlank()) {
+                            // Hold the auto-listen loop while this final utterance is submitted.
+                            isProcessingState.value = true
+                        }
+                    }
                 }
             },
             onSpeakingStateChanged = { speaking ->
                 runOnUiThread {
                     isSpeakingState.value = speaking
+                    if (!speaking) isProcessingState.value = false
+                }
+            },
+            onRecognitionStateChanged = { listening ->
+                runOnUiThread {
+                    isListeningState.value = listening
+                }
+            },
+            onRecognitionError = { error ->
+                runOnUiThread {
+                    isListeningState.value = false
+                    val recoverable = error == android.speech.SpeechRecognizer.ERROR_NO_MATCH ||
+                        error == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                    if (isHandsFreeEnabledState.value && !recoverable) {
+                        isHandsFreeEnabledState.value = false
+                        isProcessingState.value = false
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sir, voice recognition service mein problem aayi. Hands-Free ruk gaya hai; mic dobara try karein.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         )
@@ -167,6 +202,7 @@ class MainActivity : ComponentActivity() {
         var currentLanguage by remember {
             mutableStateOf(AssistantLanguage.HINGLISH)
         }
+        var productivityTab by remember { mutableStateOf(ProductivityTab.REMINDERS) }
 
         val scope = rememberCoroutineScope()
 
@@ -174,7 +210,7 @@ class MainActivity : ComponentActivity() {
             currentScreen = when (currentScreen) {
                 Screen.MENU -> Screen.HOME
                 Screen.CHAT -> Screen.HOME
-                Screen.SETTINGS, Screen.SMART_ADS, Screen.APPROVALS -> Screen.MENU
+                Screen.SETTINGS, Screen.SMART_ADS, Screen.APPROVALS, Screen.PRODUCTIVITY -> Screen.MENU
                 Screen.HOME -> Screen.HOME
             }
         }
@@ -195,9 +231,15 @@ class MainActivity : ComponentActivity() {
         val isSpeaking by isSpeakingState
         val transcript by transcriptState
         val isFinalTranscript by isFinalTranscriptState
+        val isHandsFreeEnabled by isHandsFreeEnabledState
+        val isProcessing by isProcessingState
 
         fun handleSendMessage(userText: String) {
-            if (userText.isBlank()) return
+            if (userText.isBlank()) {
+                isProcessingState.value = false
+                return
+            }
+            isProcessingState.value = true
 
             // Explicit multi-step commands are executed locally in order. Each step is
             // re-checked by the action router, including the finance-screen guard.
@@ -349,11 +391,15 @@ class MainActivity : ComponentActivity() {
             )
 
             scope.launch {
-                val response = geminiClient.generateAngelResponse(
-                    prompt = userText,
-                    history = messages,
-                    language = currentLanguage
-                )
+                val response = try {
+                    geminiClient.generateAngelResponse(
+                        prompt = userText,
+                        history = messages,
+                        language = currentLanguage
+                    )
+                } catch (_: Exception) {
+                    "Sir, abhi response connect nahi ho saka. Internet connection check karke dobara try karein."
+                }
 
                 messages.add(
                     ChatMessage(
@@ -380,6 +426,17 @@ class MainActivity : ComponentActivity() {
         }
 
         fun handleMicToggle() {
+            // In Hands-Free mode the same mic control safely exits the continuous session.
+            if (isHandsFreeEnabledState.value) {
+                isHandsFreeEnabledState.value = false
+                voiceManager.stopListening()
+                isListeningState.value = false
+                isProcessingState.value = false
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                return
+            }
+
             if (isListening) {
                 // stopListening() returns before Android delivers the final recognition
                 // callback. Wait briefly for that callback instead of submitting a stale
@@ -423,8 +480,70 @@ class MainActivity : ComponentActivity() {
 
                 transcriptState.value = ""
                 isFinalTranscriptState.value = false
-                voiceManager.startListening(currentLanguage)
-                isListeningState.value = true
+                if (!voiceManager.startListening(currentLanguage)) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Sir, speech recognition start nahi ho paayi. Google voice input check karein.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+
+        // Hands-Free consumes each final transcript exactly once, submits it automatically,
+        // and waits until Angel has finished speaking before reopening the microphone.
+        LaunchedEffect(isHandsFreeEnabled, isFinalTranscript) {
+            if (isHandsFreeEnabled && isFinalTranscript) {
+                val spoken = transcriptState.value.trim()
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                if (spoken.isNotBlank()) {
+                    handleSendMessage(spoken)
+                } else {
+                    isProcessingState.value = false
+                }
+            }
+        }
+
+        LaunchedEffect(isHandsFreeEnabled, isListening, isProcessing, isSpeaking, currentScreen) {
+            if (isHandsFreeEnabled && currentScreen != Screen.CHAT) {
+                isHandsFreeEnabledState.value = false
+                voiceManager.stopListening()
+                isListeningState.value = false
+                isProcessingState.value = false
+                return@LaunchedEffect
+            }
+
+            if (isHandsFreeEnabled && currentScreen == Screen.CHAT &&
+                !isListening && !isProcessing && !isSpeaking
+            ) {
+                // SpeechRecognizer often needs time to finish the previous session.
+                // Retry briefly instead of disabling Hands-Free on the first busy response.
+                delay(700L)
+                var started = false
+                for (attempt in 0 until 5) {
+                    if (!isHandsFreeEnabledState.value || currentScreen != Screen.CHAT ||
+                        isListeningState.value || isProcessingState.value || isSpeakingState.value
+                    ) {
+                        return@LaunchedEffect
+                    }
+                    if (voiceManager.startListening(currentLanguage)) {
+                        started = true
+                        break
+                    }
+                    delay(400L)
+                }
+                if (!started && isHandsFreeEnabledState.value && currentScreen == Screen.CHAT &&
+                    !isListeningState.value && !isProcessingState.value && !isSpeakingState.value
+                ) {
+                    isHandsFreeEnabledState.value = false
+                    isProcessingState.value = false
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Sir, speech recognition baar-baar start nahi ho paayi. Google voice input aur microphone permission check karein.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
 
@@ -502,7 +621,45 @@ class MainActivity : ComponentActivity() {
                 },
                 onHandsFree = {
                     currentScreen = Screen.CHAT
-                    handleMicToggle()
+                    if (ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.RECORD_AUDIO
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        checkAndRequestPermissions()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sir, microphone permission allow karke Hands-Free dobara start karein.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        isHandsFreeEnabledState.value = true
+                        isProcessingState.value = false
+                        isListeningState.value = false
+                        transcriptState.value = ""
+                        isFinalTranscriptState.value = false
+                        // Let the single Hands-Free effect start recognition. Starting here too
+                        // can race with Compose and create duplicate/busy recognizer sessions.
+                    }
+                },
+                onOpenReminders = {
+                    productivityTab = ProductivityTab.REMINDERS
+                    currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenTasks = {
+                    productivityTab = ProductivityTab.TASKS
+                    currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenTodo = {
+                    productivityTab = ProductivityTab.TODO
+                    currentScreen = Screen.PRODUCTIVITY
+                },
+                onOpenDialer = {
+                    try {
+                        startActivity(Intent(Intent.ACTION_DIAL))
+                    } catch (_: Exception) {
+                        Toast.makeText(this@MainActivity, "Phone dialer open nahi ho saka.", Toast.LENGTH_LONG).show()
+                    }
                 }
             )
 
@@ -511,6 +668,8 @@ class MainActivity : ComponentActivity() {
                 language = currentLanguage,
                 isListening = isListening,
                 isSpeaking = isSpeaking,
+                isHandsFreeEnabled = isHandsFreeEnabled,
+                isProcessing = isProcessing,
                 transcript = transcript,
                 onSendMessage = {
                     handleSendMessage(it)
@@ -562,6 +721,11 @@ class MainActivity : ComponentActivity() {
                 onBack = {
                     currentScreen = Screen.MENU
                 }
+            )
+
+            Screen.PRODUCTIVITY -> ProductivityScreen(
+                initialTab = productivityTab,
+                onBack = { currentScreen = Screen.MENU }
             )
 
             Screen.SETTINGS -> SettingsScreen(
