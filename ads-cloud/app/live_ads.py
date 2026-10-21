@@ -182,6 +182,7 @@ async def provider_callback(provider: str, code: str = Query(...), state: str = 
     _require_provider_config(provider)
     _consume_state(state, provider)
     token = await _exchange_code(provider, code)
+    token["expires_at"] = int(time.time()) + int(token.get("expires_in", 3600))
     accounts = await _discover_accounts(provider, token["access_token"])
     encrypted = _fernet().encrypt(json.dumps(token).encode()).decode()
     now = datetime.now(timezone.utc).isoformat()
@@ -213,6 +214,29 @@ def _get_connection(connection_id: str):
         token = json.loads(_fernet().decrypt(row["token_ciphertext"].encode()).decode())
     except (InvalidToken, ValueError, TypeError):
         raise HTTPException(status_code=503, detail="Stored provider credentials could not be decrypted.")
+    # Google access tokens expire quickly; refresh them server-side before provider calls.
+    if row["provider"] == "google_ads" and token.get("expires_at", 0) <= int(time.time()) + 120:
+        refresh_token = token.get("refresh_token")
+        if not refresh_token:
+            raise HTTPException(status_code=401, detail="Google Ads authorization expired. Reconnect this account.")
+        try:
+            with httpx.Client(timeout=15) as client:
+                refresh_response = client.post("https://oauth2.googleapis.com/token", data={
+                    "client_id": _env("GOOGLE_ADS_CLIENT_ID"),
+                    "client_secret": _env("GOOGLE_ADS_CLIENT_SECRET"),
+                    "refresh_token": refresh_token, "grant_type": "refresh_token"})
+        except httpx.HTTPError:
+            raise HTTPException(status_code=502, detail="Google Ads token refresh failed; retry shortly.")
+        if not refresh_response.is_success:
+            raise HTTPException(status_code=401, detail="Google Ads authorization expired. Reconnect this account.")
+        refreshed = refresh_response.json()
+        token["access_token"] = refreshed["access_token"]
+        token["expires_at"] = int(time.time()) + int(refreshed.get("expires_in", 3600))
+        token["refresh_token"] = refresh_token
+        encrypted = _fernet().encrypt(json.dumps(token).encode()).decode()
+        with _db() as db:
+            db.execute("UPDATE ads_connections SET token_ciphertext=?,updated_at=? WHERE id=?",
+                       (encrypted, datetime.now(timezone.utc).isoformat(), connection_id))
     return dict(row), token
 
 
