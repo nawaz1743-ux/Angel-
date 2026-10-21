@@ -30,14 +30,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.ScreenSearchDesktop
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -184,66 +178,33 @@ fun HomeScreen(
             )
         }
 
-        // TOP HEADER
+        // TOP HEADER: Menu left, Angel centered, language control right.
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "ANGEL AI",
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 2.sp,
-                    color = Slate100
-                )
-                Text(
-                    text = "YOUR PERSONAL AI",
-                    fontSize = 9.sp,
-                    letterSpacing = 1.5.sp,
-                    color = CyanAccent
-                )
+            IconButton(onClick = onOpenMenu, modifier = Modifier.size(44.dp)) {
+                Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Slate100, modifier = Modifier.size(29.dp))
             }
-
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "ANGEL AI", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp, color = Slate100, textAlign = TextAlign.Center)
+                Text(text = "YOUR PERSONAL AI", fontSize = 8.sp, letterSpacing = 1.2.sp, color = CyanAccent, textAlign = TextAlign.Center)
+            }
             Surface(
                 onClick = onToggleLanguage,
                 shape = RoundedCornerShape(12.dp),
                 color = Slate900,
                 contentColor = Slate100,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    panelBorder
-                )
+                border = androidx.compose.foundation.BorderStroke(1.dp, panelBorder)
             ) {
                 Text(
-                    text = if (language == AssistantLanguage.ENGLISH) {
-                        "English ▾"
-                    } else {
-                        "Hinglish ▾"
-                    },
+                    text = if (language == AssistantLanguage.ENGLISH) "English ▾" else "Hinglish ▾",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(
-                        horizontal = 10.dp,
-                        vertical = 11.dp
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.width(4.dp))
-
-            IconButton(
-                onClick = onNavigateSettings,
-                modifier = Modifier.size(42.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = Slate100,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 11.dp)
                 )
             }
         }
@@ -276,7 +237,7 @@ fun HomeScreen(
             )
         }
 
-        // RIGHT-SIDE ACTION CARDS
+        // Keep Chat on Home; Screen Understanding and Ads are in the Menu.
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -289,56 +250,9 @@ fun HomeScreen(
                 title = "Chat",
                 subtitle = "Ask Anything",
                 icon = {
-                    Icon(
-                        Icons.Default.Chat,
-                        contentDescription = null,
-                        tint = CyanAccent,
-                        modifier = Modifier.size(25.dp)
-                    )
+                    Icon(Icons.Default.Chat, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(25.dp))
                 },
                 onClick = onNavigateChat
-            )
-
-            ActionCard(
-                title = "Voice Input",
-                subtitle = "Hands-Free",
-                icon = {
-                    Icon(
-                        Icons.Default.Headset,
-                        contentDescription = null,
-                        tint = CyanAccent,
-                        modifier = Modifier.size(25.dp)
-                    )
-                },
-                onClick = onMicClick
-            )
-
-            ActionCard(
-                title = "Screen",
-                subtitle = "Understanding",
-                icon = {
-                    Icon(
-                        Icons.Default.ScreenSearchDesktop,
-                        contentDescription = null,
-                        tint = CyanAccent,
-                        modifier = Modifier.size(25.dp)
-                    )
-                },
-                onClick = onInspectScreen
-            )
-
-            ActionCard(
-                title = "Ads",
-                subtitle = "Approvals",
-                icon = {
-                    Icon(
-                        Icons.Default.Campaign,
-                        contentDescription = null,
-                        tint = VioletPrimary,
-                        modifier = Modifier.size(25.dp)
-                    )
-                },
-                onClick = onNavigateApprovals
             )
         }
 
@@ -381,78 +295,28 @@ fun HomeScreen(
                 ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // MIC AND SIDE BUTTONS
+            // Main animated microphone, centered for easier tapping.
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(112.dp)
+                modifier = Modifier.fillMaxWidth().height(104.dp),
+                contentAlignment = Alignment.Center
             ) {
-                ControlButton(
-                    label = "Menu",
-                    onClick = onOpenMenu,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 2.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Menu,
-                        contentDescription = "Menu",
-                        tint = CyanAccent,
-                        modifier = Modifier.size(29.dp)
-                    )
-                }
-
-                // Main animated microphone
                 Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
                         .size(94.dp)
                         .scale(micPulse)
                         .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    VioletPrimary.copy(alpha = 0.40f),
-                                    CyanAccent.copy(alpha = 0.16f),
-                                    Color.Transparent
-                                )
-                            ),
+                            Brush.radialGradient(listOf(VioletPrimary.copy(alpha = 0.40f), CyanAccent.copy(alpha = 0.16f), Color.Transparent)),
                             CircleShape
                         )
                         .border(
                             width = 3.dp,
-                            brush = Brush.linearGradient(
-                                listOf(
-                                    Color(0xFFFF85E8),
-                                    VioletPrimary,
-                                    CyanAccent
-                                )
-                            ),
+                            brush = Brush.linearGradient(listOf(Color(0xFFFF85E8), VioletPrimary, CyanAccent)),
                             shape = CircleShape
                         )
                         .clickable(onClick = onMicClick),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = "Talk to Angel",
-                        tint = Slate100,
-                        modifier = Modifier.size(43.dp)
-                    )
-                }
-
-                ControlButton(
-                    label = "Hinglish",
-                    onClick = onToggleLanguage,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 2.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = "Language and settings",
-                        tint = Slate100,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Icon(Icons.Default.Mic, contentDescription = "Talk to Angel", tint = Slate100, modifier = Modifier.size(43.dp))
                 }
             }
 
@@ -465,35 +329,6 @@ fun HomeScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = onInspectScreen,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(42.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Slate900
-                )
-            ) {
-                Icon(
-                    Icons.Default.ScreenSearchDesktop,
-                    contentDescription = null,
-                    tint = CyanAccent
-                )
-                Text(
-                    text = if (language == AssistantLanguage.ENGLISH) {
-                        "Screen Understanding"
-                    } else {
-                        "Screen Ko Samjho"
-                    },
-                    color = Slate100,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
