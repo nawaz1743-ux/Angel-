@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -178,34 +179,76 @@ fun HomeScreen(
             )
         }
 
-        // TOP HEADER: Menu left, Angel centered, language control right.
-        Row(
+        // TOP HEADER: Menu left, Angel truly centered, language and Settings on the right.
+        Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 6.dp, vertical = 5.dp)
         ) {
-            IconButton(onClick = onOpenMenu, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Slate100, modifier = Modifier.size(29.dp))
-            }
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "ANGEL AI", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp, color = Slate100, textAlign = TextAlign.Center)
-                Text(text = "YOUR PERSONAL AI", fontSize = 8.sp, letterSpacing = 1.2.sp, color = CyanAccent, textAlign = TextAlign.Center)
-            }
-            Surface(
-                onClick = onToggleLanguage,
-                shape = RoundedCornerShape(12.dp),
-                color = Slate900,
-                contentColor = Slate100,
-                border = androidx.compose.foundation.BorderStroke(1.dp, panelBorder)
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (language == AssistantLanguage.ENGLISH) "English ▾" else "Hinglish ▾",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 11.dp)
+                    text = "ANGEL AI",
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.5.sp,
+                    color = Slate100,
+                    textAlign = TextAlign.Center
                 )
+                Text(
+                    text = "YOUR PERSONAL AI",
+                    fontSize = 8.sp,
+                    letterSpacing = 1.2.sp,
+                    color = CyanAccent,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            IconButton(
+                onClick = onOpenMenu,
+                modifier = Modifier.align(Alignment.CenterStart).size(44.dp)
+            ) {
+                Icon(
+                    Icons.Default.Menu,
+                    contentDescription = "Open menu",
+                    tint = Slate100,
+                    modifier = Modifier.size(29.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    onClick = onToggleLanguage,
+                    shape = RoundedCornerShape(12.dp),
+                    color = Slate900,
+                    contentColor = Slate100,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, panelBorder)
+                ) {
+                    Text(
+                        text = if (language == AssistantLanguage.ENGLISH) "English ▾" else "Hinglish ▾",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 10.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onNavigateSettings,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Slate100,
+                        modifier = Modifier.size(25.dp)
+                    )
+                }
             }
         }
 
