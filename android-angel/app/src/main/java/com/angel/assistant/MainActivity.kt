@@ -70,13 +70,15 @@ class MainActivity : ComponentActivity() {
     private var isHandsFreeEnabledState = mutableStateOf(false)
     private var isProcessingState = mutableStateOf(false)
     private var isWakeWordEnabledState = mutableStateOf(false)
+    private var wakeWordTriggeredState = mutableStateOf(false)
 
     private val wakeWordReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == WakeWordService.ACTION_WAKEWORD_DETECTED &&
                 isWakeWordEnabledState.value && ::voiceManager.isInitialized
             ) {
-                voiceManager.startListening(AssistantLanguage.HINGLISH)
+                wakeWordTriggeredState.value = true
+                isHandsFreeEnabledState.value = true
             }
         }
     }
@@ -251,6 +253,17 @@ class MainActivity : ComponentActivity() {
         val isHandsFreeEnabled by isHandsFreeEnabledState
         val isProcessing by isProcessingState
         val isWakeWordEnabled by isWakeWordEnabledState
+        val wakeWordTriggered by wakeWordTriggeredState
+
+        LaunchedEffect(wakeWordTriggered) {
+            if (wakeWordTriggered) {
+                currentScreen = Screen.CHAT
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                isProcessingState.value = false
+                wakeWordTriggeredState.value = false
+            }
+        }
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) {
@@ -832,7 +845,8 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(WakeWordService.EXTRA_START_LISTENING, false) &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         ) {
-            window.decorView.postDelayed({ voiceManager.startListening(AssistantLanguage.HINGLISH) }, 500L)
+            wakeWordTriggeredState.value = true
+            isHandsFreeEnabledState.value = true
         }
     }
 
