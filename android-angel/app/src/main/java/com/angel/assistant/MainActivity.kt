@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -117,6 +118,11 @@ class MainActivity : ComponentActivity() {
             onSpeakingStateChanged = { speaking ->
                 runOnUiThread {
                     isSpeakingState.value = speaking
+                }
+            },
+            onListeningStateChanged = { listening ->
+                runOnUiThread {
+                    isListeningState.value = listening
                 }
             }
         )
@@ -381,35 +387,9 @@ class MainActivity : ComponentActivity() {
 
         fun handleMicToggle() {
             if (isListening) {
-                // stopListening() returns before Android delivers the final recognition
-                // callback. Wait briefly for that callback instead of submitting a stale
-                // partial transcript immediately.
-                isFinalTranscriptState.value = false
+                // Stop capture; final speech is submitted automatically on onResults.
                 voiceManager.stopListening()
                 isListeningState.value = false
-
-                scope.launch {
-                    for (attempt in 0 until 12) {
-                        if (isFinalTranscriptState.value) break
-                        delay(150L)
-                    }
-
-                    val spoken = transcriptState.value.trim()
-                    val hasFinalResult = isFinalTranscriptState.value
-
-                    if (hasFinalResult && spoken.isNotBlank()) {
-                        handleSendMessage(spoken)
-                    } else {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Sir, awaaz ka final text nahi mila. Dobara bolkar try karein.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    transcriptState.value = ""
-                    isFinalTranscriptState.value = false
-                }
             } else {
                 if (
                     ContextCompat.checkSelfPermission(
@@ -425,6 +405,24 @@ class MainActivity : ComponentActivity() {
                 isFinalTranscriptState.value = false
                 voiceManager.startListening(currentLanguage)
                 isListeningState.value = true
+            }
+        }
+
+        // Submit final voice results automatically; no second mic tap is required.
+        LaunchedEffect(isFinalTranscript) {
+            if (isFinalTranscript) {
+                val spoken = transcriptState.value.trim()
+                transcriptState.value = ""
+                isFinalTranscriptState.value = false
+                if (spoken.isNotBlank()) {
+                    handleSendMessage(spoken)
+                } else if (!isListeningState.value) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Sir, awaaz clear nahi mili. Mic dabakar dobara boliye.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
 

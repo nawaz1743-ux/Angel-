@@ -15,7 +15,8 @@ import java.util.Locale
 class VoiceManager(
     private val context: Context,
     private val onTranscript: (String, Boolean) -> Unit,
-    private val onSpeakingStateChanged: (Boolean) -> Unit
+    private val onSpeakingStateChanged: (Boolean) -> Unit,
+    private val onListeningStateChanged: (Boolean) -> Unit
 ) : TextToSpeech.OnInitListener {
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -160,11 +161,16 @@ class VoiceManager(
                 RecognizerIntent.EXTRA_MAX_RESULTS,
                 3
             )
+            // Finalize speech promptly after a natural pause.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
         }
 
         try {
             recognizer.startListening(intent)
+            onListeningStateChanged(true)
         } catch (e: Exception) {
+            onListeningStateChanged(false)
             Log.e(TAG, "startListening error: ${e.message}", e)
         }
     }
@@ -174,6 +180,8 @@ class VoiceManager(
             speechRecognizer?.stopListening()
         } catch (e: Exception) {
             Log.e(TAG, "stopListening error: ${e.message}", e)
+        } finally {
+            onListeningStateChanged(false)
         }
     }
 
@@ -454,6 +462,8 @@ class VoiceManager(
 
             override fun onError(error: Int) {
                 Log.w(TAG, "Recognition error code: $error")
+                onListeningStateChanged(false)
+                onTranscript("", true)
             }
 
             override fun onResults(results: Bundle?) {
@@ -461,6 +471,7 @@ class VoiceManager(
                     SpeechRecognizer.RESULTS_RECOGNITION
                 )
                 val text = matches?.firstOrNull() ?: ""
+                onListeningStateChanged(false)
                 onTranscript(text, true)
             }
 
