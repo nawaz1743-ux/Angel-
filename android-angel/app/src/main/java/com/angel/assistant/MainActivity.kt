@@ -78,7 +78,6 @@ class MainActivity : ComponentActivity() {
                 isWakeWordEnabledState.value && ::voiceManager.isInitialized
             ) {
                 wakeWordTriggeredState.value = true
-                isHandsFreeEnabledState.value = true
             }
         }
     }
@@ -262,6 +261,8 @@ class MainActivity : ComponentActivity() {
                 isFinalTranscriptState.value = false
                 isProcessingState.value = false
                 wakeWordTriggeredState.value = false
+                delay(100L)
+                isHandsFreeEnabledState.value = true
             }
         }
 
@@ -846,7 +847,6 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         ) {
             wakeWordTriggeredState.value = true
-            isHandsFreeEnabledState.value = true
         }
     }
 
