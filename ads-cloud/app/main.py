@@ -359,3 +359,8 @@ def analyze_campaign_metrics(
         "campaign_changed": False,
         "approval_required_for_any_live_change": True,
     }
+
+
+# Live OAuth and campaign-reporting routes. Provider tokens remain server-side.
+from .live_ads import router as live_ads_router
+app.include_router(live_ads_router)
