@@ -5,4 +5,6 @@
 # Linux:   sdk.dir=/home/username/Android/Sdk
 
 # Optional Google AI Studio Gemini API Key:
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
+
+# Optional public HTTPS URL of the deployed Angel AI server
+ANGEL_AI_API_BASE_URL=
