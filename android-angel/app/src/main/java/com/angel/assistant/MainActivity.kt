@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private var isListeningState = mutableStateOf(false)
     private var isSpeakingState = mutableStateOf(false)
     private var transcriptState = mutableStateOf("")
+    private var isFinalTranscriptState = mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -108,7 +109,10 @@ class MainActivity : ComponentActivity() {
         voiceManager = VoiceManager(
             context = this,
             onTranscript = { text, isFinal ->
-                transcriptState.value = text
+                runOnUiThread {
+                    transcriptState.value = text
+                    if (isFinal) isFinalTranscriptState.value = true
+                }
             },
             onSpeakingStateChanged = { speaking ->
                 runOnUiThread {
@@ -190,6 +194,7 @@ class MainActivity : ComponentActivity() {
         val isListening by isListeningState
         val isSpeaking by isSpeakingState
         val transcript by transcriptState
+        val isFinalTranscript by isFinalTranscriptState
 
         fun handleSendMessage(userText: String) {
             if (userText.isBlank()) return
@@ -354,12 +359,13 @@ class MainActivity : ComponentActivity() {
                     ChatMessage(
                         text = response,
                         isFromUser = false,
-                        provider = if (
+                        provider = geminiClient.lastUsedModel?.let { model ->
+                            "Gemini ($model)"
+                        } ?: if (
                             BuildConfig.GEMINI_API_KEY.isNotBlank() &&
-                            BuildConfig.GEMINI_API_KEY !=
-                            "YOUR_GEMINI_API_KEY_HERE"
+                            BuildConfig.GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE"
                         ) {
-                            "Gemini 2.5 Flash"
+                            "Gemini (model unavailable)"
                         } else {
                             "Angel Assistant Engine (Offline)"
                         }
@@ -375,14 +381,34 @@ class MainActivity : ComponentActivity() {
 
         fun handleMicToggle() {
             if (isListening) {
+                // stopListening() returns before Android delivers the final recognition
+                // callback. Wait briefly for that callback instead of submitting a stale
+                // partial transcript immediately.
+                isFinalTranscriptState.value = false
                 voiceManager.stopListening()
                 isListeningState.value = false
 
-                val spoken = transcript.trim()
+                scope.launch {
+                    for (attempt in 0 until 12) {
+                        if (isFinalTranscriptState.value) break
+                        delay(150L)
+                    }
 
-                if (spoken.isNotBlank()) {
-                    handleSendMessage(spoken)
+                    val spoken = transcriptState.value.trim()
+                    val hasFinalResult = isFinalTranscriptState.value
+
+                    if (hasFinalResult && spoken.isNotBlank()) {
+                        handleSendMessage(spoken)
+                    } else {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sir, awaaz ka final text nahi mila. Dobara bolkar try karein.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+
                     transcriptState.value = ""
+                    isFinalTranscriptState.value = false
                 }
             } else {
                 if (
@@ -396,6 +422,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 transcriptState.value = ""
+                isFinalTranscriptState.value = false
                 voiceManager.startListening(currentLanguage)
                 isListeningState.value = true
             }
