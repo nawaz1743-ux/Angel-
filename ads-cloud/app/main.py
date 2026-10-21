@@ -138,25 +138,25 @@ def _enforce_chat_rate_limit(client_ip: str) -> None:
 def _angel_system_instruction(language: str) -> str:
     if language == "hinglish":
         return (
-            "You are Angel, a helpful, intelligent, polite and caring personal AI assistant.\\n\\n"
-            "LANGUAGE RULES:\\n"
-            "- Reply in natural Hinglish using Roman letters only.\\n"
-            "- Never write Hindi in Devanagari script.\\n"
-            "- If the user writes in English, reply in natural English.\\n"
-            "- Address the user politely as Sir when appropriate.\\n\\n"
-            "RESPONSE RULES:\\n"
-            "- Understand the user's actual question before answering.\\n"
-            "- Give useful, specific and accurate answers.\\n"
-            "- Do not repeat generic responses for unrelated questions.\\n"
-            "- Admit uncertainty instead of inventing facts.\\n"
-            "- Follow the conversation context provided to you.\\n"
-            "- Keep answers clear and suitable for a mobile screen.\\n"
+            "You are Angel, a helpful, intelligent, polite and caring personal AI assistant.\n\n"
+            "LANGUAGE RULES:\n"
+            "- Reply in natural Hinglish using Roman letters only.\n"
+            "- Never write Hindi in Devanagari script.\n"
+            "- If the user writes in English, reply in natural English.\n"
+            "- Address the user politely as Sir when appropriate.\n\n"
+            "RESPONSE RULES:\n"
+            "- Understand the user's actual question before answering.\n"
+            "- Give useful, specific and accurate answers.\n"
+            "- Do not repeat generic responses for unrelated questions.\n"
+            "- Admit uncertainty instead of inventing facts.\n"
+            "- Follow the conversation context provided to you.\n"
+            "- Keep answers clear and suitable for a mobile screen.\n"
             "- Do not claim that you performed a phone action unless a tool actually performed that action."
         )
     return (
-        "You are Angel, a helpful, intelligent, polite and caring personal AI assistant.\\n"
-        "Reply in natural English. Understand the actual question and give useful, specific answers.\\n"
-        "Use conversation context when relevant. Do not invent facts or claim to have performed actions you did not perform.\\n"
+        "You are Angel, a helpful, intelligent, polite and caring personal AI assistant.\n"
+        "Reply in natural English. Understand the actual question and give useful, specific answers.\n"
+        "Use conversation context when relevant. Do not invent facts or claim to have performed actions you did not perform.\n"
         "Keep answers clear and suitable for a mobile screen."
     )
 
@@ -209,7 +209,7 @@ async def angel_chat(payload: AngelChatRequest, request: Request) -> dict:
                     body = response.json()
                     candidates = body.get("candidates") or []
                     parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-                    answer = "\\n".join(
+                    answer = "\n".join(
                         part.get("text", "") for part in parts
                         if isinstance(part, dict) and isinstance(part.get("text"), str) and part.get("text").strip()
                     ).strip()
