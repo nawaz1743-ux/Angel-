@@ -41,6 +41,7 @@ import com.angel.assistant.ui.ProductivityTab
 import com.angel.assistant.ui.SettingsScreen
 import com.angel.assistant.ui.SmartAdsManagerScreen
 import com.angel.assistant.voice.VoiceManager
+import com.angel.assistant.voice.WakeWordService
 import com.angel.assistant.workflow.GoogleAdsApprovalWorkflow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -817,6 +818,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        isWakeWordEnabledState.value = getSharedPreferences("angel_voice", MODE_PRIVATE)
+            .getBoolean("wake_word_enabled", false)
         val filter = IntentFilter(WakeWordService.ACTION_WAKEWORD_DETECTED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(wakeWordReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
