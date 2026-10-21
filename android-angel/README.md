@@ -41,7 +41,7 @@ android-angel/
 ├── build.gradle.kts                   # Root build script
 ├── settings.gradle.kts                # Project & repository configuration
 ├── gradle.properties                  # JVM & AndroidX optimization flags
-├── local.properties.example           # Example local properties (SDK path & Gemini key)
+├── local.properties.example           # Example local properties (SDK path & AI server URL)
 ├── gradlew / gradlew.bat              # Gradle wrapper execution scripts
 ├── gradle/
 │   ├── libs.versions.toml             # Gradle version catalog (AGP 8.7.3, Kotlin 2.1.0, Compose BOM)
