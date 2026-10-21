@@ -31,7 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -179,7 +178,7 @@ fun HomeScreen(
             )
         }
 
-        // TOP HEADER: Menu left, Angel truly centered, language and Settings on the right.
+        // TOP HEADER: Menu left, Angel truly centered, language selector on the right.
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -238,17 +237,6 @@ fun HomeScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = onNavigateSettings,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Slate100,
-                        modifier = Modifier.size(25.dp)
-                    )
-                }
             }
         }
 
