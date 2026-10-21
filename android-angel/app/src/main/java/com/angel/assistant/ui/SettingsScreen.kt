@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +47,8 @@ import com.angel.assistant.theme.VioletPrimary
 @Composable
 fun SettingsScreen(
     currentLanguage: AssistantLanguage,
+    isWakeWordEnabled: Boolean,
+    onToggleWakeWord: (Boolean) -> Unit,
     onSelectLanguage: (AssistantLanguage) -> Unit,
     onTestVoice: () -> Unit,
     onBack: () -> Unit,
@@ -207,6 +210,43 @@ fun SettingsScreen(
                             color = Slate100,
                             modifier = Modifier.padding(start = 4.dp)
                         )
+                    }
+                }
+            }
+
+            Text(
+                text = "Wake-word Assistant",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Slate400
+            )
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Slate900),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Say \"Hey Jarvis\"", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate100)
+                            Text(
+                                "Free on-device detection. The microphone foreground-service notification stays visible while enabled. The model is licensed for personal/non-commercial use.",
+                                fontSize = 11.sp, color = Slate400, modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        Button(
+                            onClick = { onToggleWakeWord(!isWakeWordEnabled) },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isWakeWordEnabled) EmeraldGreen else Slate800)
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(if (isWakeWordEnabled) "On" else "Off", modifier = Modifier.padding(start = 4.dp), fontSize = 11.sp)
+                        }
                     }
                 }
             }

@@ -71,4 +71,5 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
+    implementation("com.github.msnilsen:openwakeword-android:0.1.0")
 }

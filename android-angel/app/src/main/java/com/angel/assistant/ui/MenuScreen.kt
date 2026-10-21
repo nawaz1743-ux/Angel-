@@ -15,14 +15,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Card
@@ -57,7 +55,11 @@ fun MenuScreen(
     onOpenSmartAds: () -> Unit,
     onOpenSettings: () -> Unit,
     onInspectScreen: () -> Unit,
-    onHandsFree: () -> Unit
+    onHandsFree: () -> Unit,
+    onOpenReminders: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTodo: () -> Unit,
+    onOpenDialer: () -> Unit
 ) {
     val menuItems = listOf(
         AngelMenuItem(
@@ -82,25 +84,13 @@ fun MenuScreen(
             "Reminders & Alarms",
             "Reminders aur alarms",
             Icons.Default.Alarm,
-            {}
+            onOpenReminders
         ),
         AngelMenuItem(
             "Call Dialer",
             "Phone dialer kholein",
             Icons.Default.Contacts,
-            {}
-        ),
-        AngelMenuItem(
-            "Task Manager",
-            "Apne tasks manage karein",
-            Icons.Default.Assignment,
-            {}
-        ),
-        AngelMenuItem(
-            "To-do List",
-            "Daily tasks ki list",
-            Icons.Default.NoteAlt,
-            {}
+            onOpenDialer
         ),
         AngelMenuItem(
             "Writing Assistant",
