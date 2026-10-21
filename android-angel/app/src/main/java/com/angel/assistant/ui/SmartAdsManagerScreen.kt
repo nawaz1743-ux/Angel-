@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
@@ -23,7 +22,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,9 +63,6 @@ fun SmartAdsManagerScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(Slate950).verticalScroll(rememberScrollState()).padding(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Slate100)
-            }
             Column(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                 Text("Smart Ads Manager", color = Slate100, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Google Ads • Facebook • Instagram", color = CyanAccent, fontSize = 12.sp)
