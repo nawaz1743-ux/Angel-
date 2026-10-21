@@ -30,6 +30,8 @@ class WakeWordService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stoppedByUser = true
+            getSharedPreferences("angel_voice", MODE_PRIVATE).edit()
+                .putBoolean("wake_word_enabled", false).apply()
             stopDetector()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
