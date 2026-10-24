@@ -471,35 +471,11 @@ class MainActivity : ComponentActivity() {
             }
 
             if (isListening) {
-                // stopListening() returns before Android delivers the final recognition
-                // callback. Wait briefly for that callback instead of submitting a stale
-                // partial transcript immediately.
-                isFinalTranscriptState.value = false
+                // Stop capture and let the final RecognitionListener callback submit the
+                // transcript. Polling here raced the callback and could delay or discard
+                // a transcript that was already visible in the input field.
                 voiceManager.stopListening()
                 isListeningState.value = false
-
-                scope.launch {
-                    for (attempt in 0 until 12) {
-                        if (isFinalTranscriptState.value) break
-                        delay(150L)
-                    }
-
-                    val spoken = transcriptState.value.trim()
-                    val hasFinalResult = isFinalTranscriptState.value
-
-                    if (hasFinalResult && spoken.isNotBlank()) {
-                        handleSendMessage(spoken)
-                    } else {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Sir, awaaz ka final text nahi mila. Dobara bolkar try karein.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    transcriptState.value = ""
-                    isFinalTranscriptState.value = false
-                }
             } else {
                 if (
                     ContextCompat.checkSelfPermission(
@@ -523,10 +499,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Hands-Free consumes each final transcript exactly once, submits it automatically,
-        // and waits until Angel has finished speaking before reopening the microphone.
-        LaunchedEffect(isHandsFreeEnabled, isFinalTranscript) {
-            if (isHandsFreeEnabled && isFinalTranscript) {
+        // Submit each final recognition result exactly once in both single-turn mic
+        // mode and Hands-Free mode. The final callback is the source of truth; do not poll
+        // Compose state after stopListening(), because Android delivers that callback later.
+        LaunchedEffect(isFinalTranscript) {
+            if (isFinalTranscript) {
                 val spoken = transcriptState.value.trim()
                 transcriptState.value = ""
                 isFinalTranscriptState.value = false
