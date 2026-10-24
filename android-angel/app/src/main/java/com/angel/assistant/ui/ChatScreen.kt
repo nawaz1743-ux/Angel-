@@ -74,9 +74,16 @@ fun ChatScreen(
     onMicClick: () -> Unit,
     onSpeakMessage: (String) -> Unit,
     onBack: () -> Unit,
+    initialPrompt: String? = null,
     modifier: Modifier = Modifier
 ) {
     var inputText by remember { mutableStateOf("") }
+
+    LaunchedEffect(initialPrompt) {
+        if (!initialPrompt.isNullOrBlank()) {
+            inputText = initialPrompt
+        }
+    }
     val listState = rememberLazyListState()
 
     LaunchedEffect(transcript) {
