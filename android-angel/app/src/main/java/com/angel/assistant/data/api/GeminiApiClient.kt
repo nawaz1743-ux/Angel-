@@ -24,23 +24,13 @@ class GeminiApiClient {
         private set
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(45, TimeUnit.SECONDS)
-        .callTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(35, TimeUnit.SECONDS)
         .build()
 
-    /*
-     * Model order requested by Shaan Sir:
-     * 1. Primary: Gemini 3.8 Flash
-     * 2. Only fallback: Gemini 3.5 Flash-Lite
-     *
-     * The fallback is attempted only if the primary request fails.
-     * Free-tier access and quota depend on the user's Google AI Studio project.
-     */
-    private val freeModelPriority = listOf(
-        "gemini-3.8-flash",
-        "gemini-3.5-flash-lite"
-    )
+    // Use exactly one Gemini model. No model fallback requests.
+    private val freeModelPriority = listOf("gemini-3.5-flash-lite")
 
     suspend fun generateAngelResponse(
         prompt: String,
@@ -299,7 +289,7 @@ class GeminiApiClient {
 
                             429 -> {
                                 quotaOrTemporaryFailureSeen = true
-                                // Try the next model.
+                                // Single-model mode: do not send another model request.
                             }
 
                             500, 502, 503, 504 -> {
@@ -322,7 +312,7 @@ class GeminiApiClient {
                                     lowerMessage.contains("resource exhausted")
                                 ) {
                                     quotaOrTemporaryFailureSeen = true
-                                    // Quota-related error: try next model.
+                                    // Single-model mode: do not retry with another model.
                                 } else {
                                     // May be an API key or permission problem.
                                     return@withContext localMessage(
@@ -377,7 +367,7 @@ class GeminiApiClient {
                 )
 
                 // A network timeout may be temporary.
-                // Try another free model, but never use a paid model.
+                // Single-model mode: do not retry against another model.
                 quotaOrTemporaryFailureSeen = true
             }
         }
@@ -386,12 +376,12 @@ class GeminiApiClient {
         val totalElapsedMs = TimeUnit.NANOSECONDS.toMillis(
             System.nanoTime() - totalStartNanos
         )
-        Log.w("GeminiApiClient", "All configured models failed; total=" + totalElapsedMs + "ms")
+        Log.w("GeminiApiClient", "Gemini 3.5 Flash-Lite request failed; total=" + totalElapsedMs + "ms")
         if (quotaOrTemporaryFailureSeen) {
             localMessage(
                 language,
-                "Sir, maine Angel ke available free Gemini models try kiye, lekin filhaal koi model jawab nahi de pa raha. Free quota limit ya temporary service/network problem ho sakti hai. Thodi der baad dobara try karein. Maine koi paid model use nahi kiya.",
-                "Sir, I tried Angel's configured free Gemini models, but none could respond right now. The free quota may be exhausted, or there may be a temporary service or network problem. Please try again later. No paid model was used."
+                "Sir, Gemini 3.5 Flash-Lite abhi jawab nahi de paaya. Free quota limit ya temporary service/network problem ho sakti hai. Kuch der baad dobara try karein. Angel ne doosre model ko request nahi bheji.",
+                "Sir, Gemini 3.5 Flash-Lite could not respond right now. The free quota may be exhausted, or there may be a temporary service or network problem. Please try again later. Angel did not send a request to another model."
             )
         } else {
             localMessage(
