@@ -369,7 +369,7 @@ app.post('/api/screen-analyze', async (req: Request, res: Response) => {
     let response: any = null;
     try {
       response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash-lite',
         contents: {
           parts: [
             {
@@ -389,22 +389,17 @@ app.post('/api/screen-analyze', async (req: Request, res: Response) => {
         ],
       },
     });
-    } catch {
-      // Fallback
-      response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: {
-          parts: [
-            { inlineData: { data: cleanBase64, mimeType } },
-            { text: prompt },
-          ],
-        },
+    } catch (err: any) {
+      console.warn('Gemini 3.5 Flash-Lite screen analysis failed:', err?.message || err);
+      res.status(503).json({
+        error: 'Gemini 3.5 Flash-Lite screen analysis is temporarily unavailable. No alternate model was called.',
       });
+      return;
     }
 
     res.json({
       analysis: response?.text || 'Screen analysis complete.',
-      provider: 'gemini-vision',
+      provider: 'gemini-3.5-flash-lite',
     });
   } catch (error: any) {
     console.error('Error in /api/screen-analyze:', error);
