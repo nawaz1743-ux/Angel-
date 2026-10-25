@@ -222,6 +222,7 @@ class MainActivity : ComponentActivity() {
             mutableStateOf(AssistantLanguage.HINGLISH)
         }
         var productivityTab by remember { mutableStateOf(ProductivityTab.REMINDERS) }
+        var chatInitialPrompt by remember { mutableStateOf<String?>(null) }
 
         val scope = rememberCoroutineScope()
 
@@ -471,35 +472,11 @@ class MainActivity : ComponentActivity() {
             }
 
             if (isListening) {
-                // stopListening() returns before Android delivers the final recognition
-                // callback. Wait briefly for that callback instead of submitting a stale
-                // partial transcript immediately.
-                isFinalTranscriptState.value = false
+                // Stop capture and let the final RecognitionListener callback submit the
+                // transcript. Polling here raced the callback and could delay or discard
+                // a transcript that was already visible in the input field.
                 voiceManager.stopListening()
                 isListeningState.value = false
-
-                scope.launch {
-                    for (attempt in 0 until 12) {
-                        if (isFinalTranscriptState.value) break
-                        delay(150L)
-                    }
-
-                    val spoken = transcriptState.value.trim()
-                    val hasFinalResult = isFinalTranscriptState.value
-
-                    if (hasFinalResult && spoken.isNotBlank()) {
-                        handleSendMessage(spoken)
-                    } else {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Sir, awaaz ka final text nahi mila. Dobara bolkar try karein.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    transcriptState.value = ""
-                    isFinalTranscriptState.value = false
-                }
             } else {
                 if (
                     ContextCompat.checkSelfPermission(
@@ -523,10 +500,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Hands-Free consumes each final transcript exactly once, submits it automatically,
-        // and waits until Angel has finished speaking before reopening the microphone.
-        LaunchedEffect(isHandsFreeEnabled, isFinalTranscript) {
-            if (isHandsFreeEnabled && isFinalTranscript) {
+        // Submit each final recognition result exactly once in both single-turn mic
+        // mode and Hands-Free mode. The final callback is the source of truth; do not poll
+        // Compose state after stopListening(), because Android delivers that callback later.
+        LaunchedEffect(isFinalTranscript) {
+            if (isFinalTranscript) {
                 val spoken = transcriptState.value.trim()
                 transcriptState.value = ""
                 isFinalTranscriptState.value = false
@@ -627,6 +605,31 @@ class MainActivity : ComponentActivity() {
 
             Screen.MENU -> MenuScreen(
                 onOpenChat = {
+                    chatInitialPrompt = null
+                    currentScreen = Screen.CHAT
+                },
+                onOpenWriting = {
+                    chatInitialPrompt = if (currentLanguage == AssistantLanguage.HINGLISH) {
+                        "Writing Assistant: Mere liye jo text chahiye use draft karo. Pehle audience, purpose aur tone samajh kar concise, ready-to-use draft do. Agar details missing hain, ek short clarification poochho."
+                    } else {
+                        "Writing Assistant: Help me draft the text I need. Consider audience, purpose, and tone, then provide a concise ready-to-use draft. Ask one brief clarification if essential details are missing."
+                    }
+                    currentScreen = Screen.CHAT
+                },
+                onOpenTranslation = {
+                    chatInitialPrompt = if (currentLanguage == AssistantLanguage.HINGLISH) {
+                        "Translation mode: Mujhse source text aur target language lo. Meaning, names aur tone preserve karke translation do; extra explanation mat do jab tak main na maangoon."
+                    } else {
+                        "Translation mode: Ask me for the source text and target language. Preserve meaning, names, and tone; do not add explanations unless I ask."
+                    }
+                    currentScreen = Screen.CHAT
+                },
+                onOpenLearning = {
+                    chatInitialPrompt = if (currentLanguage == AssistantLanguage.HINGLISH) {
+                        "Learning Assistant: Mujhe topic simple Roman Hinglish mein step-by-step samjhao, ek practical example do, aur end mein ek chhota check-question poochho."
+                    } else {
+                        "Learning Assistant: Teach me the topic step by step in simple English, give one practical example, and finish with one short check question."
+                    }
                     currentScreen = Screen.CHAT
                 },
                 onOpenApprovals = {
@@ -715,7 +718,9 @@ class MainActivity : ComponentActivity() {
                 },
                 onBack = {
                     currentScreen = Screen.HOME
-                }
+                },
+                initialPrompt = chatInitialPrompt,
+                onInitialPromptConsumed = { chatInitialPrompt = null }
             )
 
             Screen.SMART_ADS -> SmartAdsManagerScreen(

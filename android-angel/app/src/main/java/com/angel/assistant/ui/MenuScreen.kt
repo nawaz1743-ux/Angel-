@@ -51,6 +51,9 @@ data class AngelMenuItem(
 @Composable
 fun MenuScreen(
     onOpenChat: () -> Unit,
+    onOpenWriting: () -> Unit,
+    onOpenTranslation: () -> Unit,
+    onOpenLearning: () -> Unit,
     onOpenApprovals: () -> Unit,
     onOpenSmartAds: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -87,6 +90,18 @@ fun MenuScreen(
             onOpenReminders
         ),
         AngelMenuItem(
+            "Task Manager",
+            "Tasks ko alag se manage karein",
+            Icons.Default.Apps,
+            onOpenTasks
+        ),
+        AngelMenuItem(
+            "To-do List",
+            "Apni to-do list kholein",
+            Icons.Default.MenuBook,
+            onOpenTodo
+        ),
+        AngelMenuItem(
             "Call Dialer",
             "Phone dialer kholein",
             Icons.Default.Contacts,
@@ -96,19 +111,19 @@ fun MenuScreen(
             "Writing Assistant",
             "Messages aur writing mein madad",
             Icons.Default.MenuBook,
-            onOpenChat
+            onOpenWriting
         ),
         AngelMenuItem(
             "Translation",
             "Languages translate karein",
             Icons.Default.Translate,
-            onOpenChat
+            onOpenTranslation
         ),
         AngelMenuItem(
             "Learning Assistant",
             "Naye topics seekhein",
             Icons.Default.Language,
-            onOpenChat
+            onOpenLearning
         ),
         AngelMenuItem(
             "Smart Ads Manager",
