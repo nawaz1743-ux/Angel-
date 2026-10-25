@@ -31,7 +31,33 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = parseInt(process.env.PORT || '3000', 10);
 
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '1mb' }));
+
+// Render and other reverse-proxy hosts forward the real client IP.
+app.set('trust proxy', 1);
+
+// Basic per-IP abuse protection for the public mobile proxy. This is deliberately
+// independent of any secret shipped in the APK (which would not be a secret).
+const chatRateBuckets = new Map<string, { windowStartedAt: number; count: number }>();
+const CHAT_RATE_WINDOW_MS = 60_000;
+const CHAT_RATE_MAX_REQUESTS = 20;
+app.use('/api/chat', (req: Request, res: Response, next) => {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  const current = chatRateBuckets.get(key);
+  if (!current || now - current.windowStartedAt >= CHAT_RATE_WINDOW_MS) {
+    chatRateBuckets.set(key, { windowStartedAt: now, count: 1 });
+    next();
+    return;
+  }
+  current.count += 1;
+  if (current.count > CHAT_RATE_MAX_REQUESTS) {
+    res.setHeader('Retry-After', String(Math.ceil((CHAT_RATE_WINDOW_MS - (now - current.windowStartedAt)) / 1000)));
+    res.status(429).json({ error: 'Too many chat requests. Please wait a minute and try again.' });
+    return;
+  }
+  next();
+});
 
 // 1. Google Gemini Client (Free-Tier eligible)
 const geminiApiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_KEY;
@@ -195,6 +221,15 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       providerPriority = 'auto',
       allowPaidUsage = false,
     } = req.body;
+
+    if (typeof message === 'string' && message.length > 8000) {
+      res.status(413).json({ error: 'Message is too long. Maximum length is 8000 characters.' });
+      return;
+    }
+    if (Array.isArray(history) && history.length > 10) {
+      res.status(400).json({ error: 'Conversation history is too long. Maximum is 10 turns.' });
+      return;
+    }
 
     if (!message || typeof message !== 'string') {
       res.status(400).json({ error: 'Message text is required' });
