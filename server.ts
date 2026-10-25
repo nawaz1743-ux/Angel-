@@ -392,6 +392,24 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'Message or conversation history exceeds limits.' });
     return;
   }
+
+  // Keep deterministic date/time questions local in both normal and streaming chat.
+  // This avoids sending a simple phone-time request to Gemini or failing it when
+  // the cloud model is unavailable.
+  const selectedLang: AssistantLanguage = language === 'english' ? 'english' : 'hinglish';
+  if (isDateOrTimeQuery(message)) {
+    const reply = getLocalDateAnswer(message, selectedLang);
+    res.status(200);
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+    res.write(JSON.stringify({ type: 'chunk', text: reply }) + '\\n');
+    res.write(JSON.stringify({ type: 'done', provider: 'angel-local-date-engine' }) + '\\n');
+    res.end();
+    return;
+  }
+
   if (!ai) {
     res.status(503).json({ error: 'Gemini is not configured on the server.' });
     return;
@@ -403,7 +421,6 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
-  const selectedLang: AssistantLanguage = language === 'english' ? 'english' : 'hinglish';
   const systemInstruction = getAngelSystemInstruction(selectedLang, personality);
   const candidates = planProviderExecutionOrder({
     hasGeminiKey: Boolean(ai),
