@@ -21,7 +21,7 @@ A dedicated, native Android AI assistant built with **Kotlin** and **Jetpack Com
    - Native Android `SpeechRecognizer` for touch-to-talk voice recognition.
    - Native `TextToSpeech` configured for Indian English female voice playback.
 4. **Secure Gemini AI Integration**:
-   - Direct integration with Google Gemini (`gemini-2.5-flash`).
+   - Direct integration with Google Gemini (`gemini-3.5-flash-lite` only).
    - **Zero Secrets in Code**: The API key is loaded from `local.properties` (or environment variable `GEMINI_API_KEY`) at build time via `BuildConfig.GEMINI_API_KEY`.
    - **Offline Fallback Engine**: If no API key is supplied or the phone is offline, Angel responds via an intelligent embedded local engine for tasks, greetings, dates, and phone intents.
 5. **Screen Understanding (Accessibility Service)**:
