@@ -25,9 +25,9 @@ class GeminiApiClient {
 
     private val httpClient = OkHttpClient.Builder()
         .retryOnConnectionFailure(false)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(35, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(18, TimeUnit.SECONDS)
         .build()
 
     // Use exactly one Gemini model. No model fallback requests.
@@ -89,7 +89,7 @@ class GeminiApiClient {
 
         val contentsArray = JSONArray()
 
-        // Keep recent conversation context.
+        // Keep only a short recent context to reduce request payload and latency.
         // Gemini expects alternating user/model messages.
         // MainActivity already appended the current prompt to history.
         // Remove that final user entry because prompt is added separately below.
@@ -99,7 +99,7 @@ class GeminiApiClient {
         ) history.dropLast(1) else history
 
         val recentHistory = historyWithoutCurrentPrompt
-            .takeLast(8)
+            .takeLast(4)
             .filter { it.text.isNotBlank() }
 
         for (msg in recentHistory) {
@@ -149,8 +149,8 @@ class GeminiApiClient {
             put(
                 "generationConfig",
                 JSONObject().apply {
-                    put("temperature", 0.7)
-                    put("maxOutputTokens", 2048)
+                    put("temperature", 0.5)
+                    put("maxOutputTokens", 768)
                 }
             )
         }
@@ -372,7 +372,7 @@ class GeminiApiClient {
             }
         }
 
-        // Every configured free model attempt failed.
+        // The single configured Gemini model attempt failed.
         val totalElapsedMs = TimeUnit.NANOSECONDS.toMillis(
             System.nanoTime() - totalStartNanos
         )
