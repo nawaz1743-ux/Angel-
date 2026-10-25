@@ -24,6 +24,7 @@ class GeminiApiClient {
         private set
 
     private val httpClient = OkHttpClient.Builder()
+        .retryOnConnectionFailure(false)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .callTimeout(35, TimeUnit.SECONDS)
@@ -159,7 +160,7 @@ class GeminiApiClient {
 
         val totalStartNanos = System.nanoTime()
 
-        for (model in freeModelPriority) {
+        for (model in freeModelPriority) { // The list intentionally contains one model only.
 
             val modelStartNanos = System.nanoTime()
             try {
@@ -294,7 +295,7 @@ class GeminiApiClient {
 
                             500, 502, 503, 504 -> {
                                 quotaOrTemporaryFailureSeen = true
-                                // Try the next model.
+                                // No fallback model is configured; finish this single attempt.
                             }
 
                             404 -> {
@@ -366,8 +367,7 @@ class GeminiApiClient {
                     "$model request failed after " + modelElapsedMs + "ms: " + lastErrorMessage
                 )
 
-                // A network timeout may be temporary.
-                // Single-model mode: do not retry against another model.
+                // Single-model mode: record the failure without retrying another model.
                 quotaOrTemporaryFailureSeen = true
             }
         }
