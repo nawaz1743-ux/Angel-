@@ -11,9 +11,10 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
-val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY")
-    ?: System.getenv("GEMINI_API_KEY")
-    ?: ""
+// Only the public HTTPS proxy URL is packaged in the app. Gemini secrets stay server-side.
+val angelApiBaseUrl: String = localProperties.getProperty("ANGEL_API_BASE_URL")
+    ?: System.getenv("ANGEL_API_BASE_URL")
+    ?: "https://angel-ai-proxy.onrender.com"
 
 android {
     namespace = "com.angel.assistant"
@@ -28,7 +29,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "ANGEL_API_BASE_URL", "\"$angelApiBaseUrl\"")
     }
 
     buildTypes {
@@ -40,7 +41,7 @@ android {
             )
         }
         debug {
-            buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+            buildConfigField("String", "ANGEL_API_BASE_URL", "\"$angelApiBaseUrl\"")
         }
     }
 
