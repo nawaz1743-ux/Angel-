@@ -148,7 +148,7 @@ app.get('/api/providers', (_req: Request, res: Response) => {
       details: isGeminiQuotaExhausted
         ? 'Free tier quota exhausted (429 received from Google API). Will retry automatically.'
         : geminiApiKey
-        ? 'Free-tier eligible (gemini-2.5-flash, gemini-3.5-flash-lite, gemini-2.0-flash).'
+        ? 'Single Gemini model: gemini-3.5-flash-lite.'
         : 'GEMINI_API_KEY not configured.',
       supportedModels: GEMINI_FREE_TIER_MODELS,
     },
