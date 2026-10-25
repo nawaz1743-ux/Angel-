@@ -39,8 +39,10 @@ export interface ChatTurn {
   text: string;
 }
 
-// Known Free-Tier eligible models on Google Gemini
+// Gemini execution order: preferred model first, compatible lightweight fallback second.
+// API billing/free-tier availability is controlled by Google's account/project quota.
 export const GEMINI_FREE_TIER_MODELS = [
+  'gemini-3.8-flash',
   'gemini-3.5-flash-lite',
 ];
 
