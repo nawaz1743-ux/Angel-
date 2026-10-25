@@ -41,9 +41,7 @@ export interface ChatTurn {
 
 // Known Free-Tier eligible models on Google Gemini
 export const GEMINI_FREE_TIER_MODELS = [
-  'gemini-2.5-flash',
   'gemini-3.5-flash-lite',
-  'gemini-2.0-flash',
 ];
 
 // OpenAI models (Paid API account required; no free public API tier guaranteed)
