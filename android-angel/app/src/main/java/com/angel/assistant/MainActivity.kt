@@ -455,14 +455,7 @@ class MainActivity : ComponentActivity() {
                         isFromUser = false,
                         provider = geminiClient.lastUsedModel?.let { model ->
                             "Gemini ($model)"
-                        } ?: if (
-                            BuildConfig.GEMINI_API_KEY.isNotBlank() &&
-                            BuildConfig.GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE"
-                        ) {
-                            "Gemini (model unavailable)"
-                        } else {
-                            "Angel Assistant Engine (Offline)"
-                        }
+                        } ?: "Angel AI Proxy (model unavailable)"
                     )
                 )
 
