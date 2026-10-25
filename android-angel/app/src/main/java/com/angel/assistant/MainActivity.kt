@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var voiceManager: VoiceManager
 
     private val geminiClient = GeminiApiClient()
+    // Prevent overlapping ordinary AI calls from duplicate UI/voice submission callbacks.
+    @Volatile private var aiRequestInFlight = false
     private val adsWorkflow = GoogleAdsApprovalWorkflow()
     private val actionCommandRouter by lazy { ActionCommandRouter(this) }
 
@@ -431,6 +433,13 @@ class MainActivity : ComponentActivity() {
                 return
             }
 
+            // Guard the network-AI path before adding the user turn. This prevents two
+            // rapid submit/final-transcript callbacks from sending the same turn concurrently.
+            if (aiRequestInFlight) {
+                Log.w("AngelAI", "Ignored overlapping AI submission while a request is active")
+                return
+            }
+            aiRequestInFlight = true
             messages.add(
                 ChatMessage(
                     text = userText,
@@ -439,30 +448,35 @@ class MainActivity : ComponentActivity() {
             )
 
             scope.launch {
-                val response = try {
-                    geminiClient.generateAngelResponse(
-                        prompt = userText,
-                        history = messages,
-                        language = currentLanguage
+                try {
+                    val response = try {
+                        geminiClient.generateAngelResponse(
+                            prompt = userText,
+                            history = messages,
+                            language = currentLanguage
+                        )
+                    } catch (_: Exception) {
+                        "Sir, abhi response connect nahi ho saka. Internet connection check karke dobara try karein."
+                    }
+
+                    messages.add(
+                        ChatMessage(
+                            text = response,
+                            isFromUser = false,
+                            provider = geminiClient.lastUsedModel?.let { model ->
+                                "Gemini ($model)"
+                            } ?: "Angel AI Proxy (model unavailable)"
+                        )
                     )
-                } catch (_: Exception) {
-                    "Sir, abhi response connect nahi ho saka. Internet connection check karke dobara try karein."
+
+                    voiceManager.speak(
+                        response,
+                        currentLanguage
+                    )
+                } finally {
+                    aiRequestInFlight = false
+                    if (!isSpeakingState.value) isProcessingState.value = false
                 }
-
-                messages.add(
-                    ChatMessage(
-                        text = response,
-                        isFromUser = false,
-                        provider = geminiClient.lastUsedModel?.let { model ->
-                            "Gemini ($model)"
-                        } ?: "Angel AI Proxy (model unavailable)"
-                    )
-                )
-
-                voiceManager.speak(
-                    response,
-                    currentLanguage
-                )
             }
         }
 
