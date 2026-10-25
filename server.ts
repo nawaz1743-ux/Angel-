@@ -378,6 +378,92 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 });
 
 /**
+ * Streaming chat endpoint. Emits newline-delimited JSON events:
+ * {"type":"chunk","text":"..."} and one final {"type":"done","provider":"..."}.
+ * If a model fails before producing text, the next configured Gemini model is tried.
+ */
+app.post('/api/chat/stream', async (req: Request, res: Response) => {
+  const { message, history = [], language = 'hinglish', personality = 'friendly' } = req.body || {};
+  if (typeof message !== 'string' || !message.trim()) {
+    res.status(400).json({ error: 'Message text is required' });
+    return;
+  }
+  if (message.length > 8000 || !Array.isArray(history) || history.length > 10) {
+    res.status(400).json({ error: 'Message or conversation history exceeds limits.' });
+    return;
+  }
+  if (!ai) {
+    res.status(503).json({ error: 'Gemini is not configured on the server.' });
+    return;
+  }
+
+  res.status(200);
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const selectedLang: AssistantLanguage = language === 'english' ? 'english' : 'hinglish';
+  const systemInstruction = getAngelSystemInstruction(selectedLang, personality);
+  const candidates = planProviderExecutionOrder({
+    hasGeminiKey: Boolean(ai),
+    hasOpenAiKey: Boolean(openAiClient),
+    allowPaidUsage: false,
+    priority: 'gemini-first',
+    geminiQuotaCooldownUntil,
+    openAiAuthFailed,
+  }).candidates.filter((candidate) => candidate.provider === 'gemini');
+
+  let sentAnyText = false;
+  let lastError: any = null;
+  try {
+    for (const candidate of candidates) {
+      try {
+        const contents = formatHistoryForGemini(Array.isArray(history) ? history : [], message);
+        const stream = await ai.models.generateContentStream({
+          model: candidate.model,
+          contents,
+          config: { systemInstruction, temperature: 0.7 },
+        });
+        let modelText = '';
+        for await (const chunk of stream) {
+          if (req.aborted || res.destroyed) return;
+          const textChunk = typeof chunk.text === 'string' ? chunk.text : '';
+          if (!textChunk) continue;
+          modelText += textChunk;
+          sentAnyText = true;
+          res.write(JSON.stringify({ type: 'chunk', text: textChunk }) + '\n');
+        }
+        if (modelText.trim()) {
+          res.write(JSON.stringify({ type: 'done', provider: `Gemini (${candidate.model})` }) + '\n');
+          res.end();
+          return;
+        }
+      } catch (error: any) {
+        lastError = error;
+        const classified = classifyApiError(error);
+        console.warn(`Gemini stream model ${candidate.model} failed (${classified.status}):`, classified.message.slice(0, 140));
+        if (classified.isQuota) geminiQuotaCooldownUntil = Date.now() + 60000;
+        // Once text has reached the client, restarting with another model would duplicate/contradict it.
+        if (sentAnyText) break;
+      }
+    }
+    if (!sentAnyText) {
+      const classified = lastError ? classifyApiError(lastError) : null;
+      const failure = buildMultiProviderFailureReply(selectedLang, classified?.isQuota ? 'quota' : 'connection_error', message);
+      res.write(JSON.stringify({ type: 'error', message: failure.reply }) + '\n');
+    }
+    res.end();
+  } catch (error: any) {
+    console.error('Fatal streaming chat error:', error?.message || error);
+    if (!res.destroyed) {
+      if (!sentAnyText) res.write(JSON.stringify({ type: 'error', message: buildMultiProviderFailureReply(selectedLang, 'connection_error', message).reply }) + '\n');
+      res.end();
+    }
+  }
+});
+
+/**
  * Endpoint: /api/screen-analyze
  * Analyzes screenshots or mobile camera captures
  */
