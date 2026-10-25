@@ -32,6 +32,8 @@ test('Multi-Provider: Default plan prioritizes Gemini free-tier models and block
   assert.ok(plan.candidates.length > 0, 'Should have candidate models');
   assert.equal(plan.candidates.every((c) => c.provider === 'gemini'), true, 'All candidates must be Gemini when paid usage is disabled');
   assert.equal(plan.candidates[0].model, GEMINI_FREE_TIER_MODELS[0]);
+  assert.deepEqual(GEMINI_FREE_TIER_MODELS, ['gemini-3.5-flash-lite'], 'Only Gemini 3.5 Flash-Lite may be configured');
+  assert.equal(plan.candidates.filter((c) => c.provider === 'gemini').length, 1, 'Exactly one Gemini model request may be planned');
   assert.equal(plan.candidates[0].isPaid, false, 'Gemini models must be flagged as free-tier');
 });
 
