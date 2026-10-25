@@ -68,7 +68,10 @@ export function planProviderExecutionOrder(config: MultiProviderConfig): {
     config.geminiQuotaCooldownUntil && config.geminiQuotaCooldownUntil > now
   );
 
-  const canUseGemini = config.hasGeminiKey && !isGeminiQuotaCooledDown;
+  // A previous 429 should be reported in provider status, but must not disable
+  // every Gemini model for the entire cooldown window. Each request still tries
+  // the configured model cascade so a model-specific limit can fall through.
+  const canUseGemini = config.hasGeminiKey;
   const canUseOpenAi = config.hasOpenAiKey && !config.openAiAuthFailed;
 
   if (config.priority === 'openai-first') {
