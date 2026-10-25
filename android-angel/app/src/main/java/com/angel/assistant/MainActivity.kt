@@ -75,10 +75,24 @@ class MainActivity : ComponentActivity() {
 
     private val wakeWordReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == WakeWordService.ACTION_WAKEWORD_DETECTED &&
-                isWakeWordEnabledState.value && ::voiceManager.isInitialized
-            ) {
-                wakeWordTriggeredState.value = true
+            when (intent?.action) {
+                WakeWordService.ACTION_WAKEWORD_DETECTED -> {
+                    if (isWakeWordEnabledState.value && ::voiceManager.isInitialized) {
+                        wakeWordTriggeredState.value = true
+                    }
+                }
+                WakeWordService.ACTION_WAKEWORD_ERROR -> {
+                    isWakeWordEnabledState.value = false
+                    getSharedPreferences("angel_voice", MODE_PRIVATE).edit()
+                        .putBoolean("wake_word_enabled", false).apply()
+                    val detail = intent.getStringExtra(WakeWordService.EXTRA_WAKEWORD_ERROR)
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Jarvis wake-word start nahi ho saka. Settings mein dobara enable karein." +
+                            (detail?.let { " ($it)" } ?: ""),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
