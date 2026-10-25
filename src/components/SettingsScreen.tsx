@@ -45,7 +45,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       status: 'ready',
       isFreeTierEligible: true,
       details: 'Checking live status...',
-      supportedModels: ['gemini-2.5-flash', 'gemini-3.5-flash-lite'],
+      supportedModels: ['gemini-3.5-flash-lite'],
     },
     {
       id: 'openai',
@@ -253,7 +253,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-bold text-white">
             <Cpu className="w-4 h-4 text-cyan-400" />
-            <span>Multi-Provider AI System (Gemini & OpenAI)</span>
+            <span>AI Provider Status</span>
           </div>
           <button
             onClick={fetchProviders}
@@ -265,7 +265,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
 
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          Angel uses automated multi-model failover to eliminate 429 quota interruptions, prioritizing free-tier Gemini access and strictly protecting against unauthorized paid usage.
+          Angel's Gemini model is fixed to Gemini 3.5 Flash-Lite. It does not try other Gemini models.
         </p>
 
         {/* Provider Priority Selection */}
