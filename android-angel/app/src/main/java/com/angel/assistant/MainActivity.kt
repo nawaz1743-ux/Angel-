@@ -465,7 +465,7 @@ class MainActivity : ComponentActivity() {
                             text = response,
                             isFromUser = false,
                             provider = geminiClient.lastUsedModel?.let { model ->
-                                "Gemini ($model)"
+                                model.removePrefix("Gemini (").removeSuffix(")")
                             } ?: "Angel AI Proxy (model unavailable)"
                         )
                     )
