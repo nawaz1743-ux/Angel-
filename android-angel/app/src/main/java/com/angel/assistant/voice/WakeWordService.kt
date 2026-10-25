@@ -50,12 +50,19 @@ class WakeWordService : Service() {
                     Log.i(TAG, "Hey Jarvis detected, score=$score")
                     sendBroadcast(Intent(ACTION_WAKEWORD_DETECTED).setPackage(packageName))
                     val manager = getSystemService(NotificationManager::class.java)
-                    manager.notify(NOTIFICATION_ID, buildNotification("Wake-word detected — open Angel to speak"))
+                    manager.notify(NOTIFICATION_ID, buildNotification("Jarvis detected. Tap to open Angel and start speaking."))
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Could not start wake-word detection", e)
             stopDetector()
+            getSharedPreferences("angel_voice", MODE_PRIVATE).edit()
+                .putBoolean("wake_word_enabled", false).apply()
+            sendBroadcast(
+                Intent(ACTION_WAKEWORD_ERROR)
+                    .setPackage(packageName)
+                    .putExtra(EXTRA_WAKEWORD_ERROR, e.message ?: "Unknown startup error")
+            )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -114,6 +121,8 @@ class WakeWordService : Service() {
         private const val CHANNEL_ID = "angel_wake_word"
         private const val NOTIFICATION_ID = 8217
         const val ACTION_WAKEWORD_DETECTED = "com.angel.assistant.WAKEWORD_DETECTED"
+        const val ACTION_WAKEWORD_ERROR = "com.angel.assistant.WAKEWORD_ERROR"
+        const val EXTRA_WAKEWORD_ERROR = "com.angel.assistant.WAKEWORD_ERROR_MESSAGE"
         const val EXTRA_START_LISTENING = "com.angel.assistant.START_LISTENING_AFTER_WAKE"
         const val ACTION_STOP = "com.angel.assistant.STOP_WAKEWORD"
     }
