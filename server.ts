@@ -371,7 +371,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       reply: fallbackText,
       provider: 'angel-smart-offline',
       isRealAi: false,
-      error: error?.message || 'Request handled by Angel offline engine.',
+      error: 'Angel AI service temporarily failed. Please retry shortly.',
       timestamp: Date.now(),
     });
   }
@@ -526,7 +526,7 @@ app.post('/api/screen-analyze', async (req: Request, res: Response) => {
     console.error('Error in /api/screen-analyze:', error);
     res.status(500).json({
       error: 'Failed to analyze screen capture',
-      details: error.message || String(error),
+      details: 'Screen analysis service temporarily failed. Please retry shortly.',
     });
   }
 });
