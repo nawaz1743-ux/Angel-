@@ -450,30 +450,39 @@ class MainActivity : ComponentActivity() {
 
             scope.launch {
                 try {
+                    // Add the assistant bubble immediately, then update it as streamed chunks arrive.
+                    val responseIndex = messages.size
+                    messages.add(
+                        ChatMessage(
+                            text = "",
+                            isFromUser = false,
+                            provider = "Angel AI Proxy"
+                        )
+                    )
                     val response = try {
-                        geminiClient.generateAngelResponse(
+                        geminiClient.generateAngelResponseStreaming(
                             prompt = userText,
                             history = messages,
                             language = currentLanguage
-                        )
+                        ) { partial ->
+                            if (responseIndex in messages.indices) {
+                                messages[responseIndex] = messages[responseIndex].copy(text = partial)
+                            }
+                        }
                     } catch (_: Exception) {
                         "Sir, abhi response connect nahi ho saka. Internet connection check karke dobara try karein."
                     }
 
-                    messages.add(
-                        ChatMessage(
+                    if (responseIndex in messages.indices) {
+                        messages[responseIndex] = messages[responseIndex].copy(
                             text = response,
-                            isFromUser = false,
                             provider = geminiClient.lastUsedModel?.let { model ->
                                 model.removePrefix("Gemini (").removeSuffix(")")
                             } ?: "Angel AI Proxy (model unavailable)"
                         )
-                    )
+                    }
 
-                    voiceManager.speak(
-                        response,
-                        currentLanguage
-                    )
+                    voiceManager.speak(response, currentLanguage)
                 } finally {
                     aiRequestInFlight = false
                     if (!isSpeakingState.value) isProcessingState.value = false
