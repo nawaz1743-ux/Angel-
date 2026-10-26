@@ -162,10 +162,8 @@ class GeminiApiClient {
                 .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.w("GeminiApiClient", "Streaming endpoint HTTP ${response.code}")
-                    return@withContext localMessage(language,
-                        "Sir, AI server se response nahi mila (HTTP ${response.code}).",
-                        "Sir, the AI server returned HTTP ${response.code}.")
+                    Log.w("GeminiApiClient", "Streaming endpoint HTTP ${response.code}; retrying through standard chat endpoint")
+                    return@withContext generateAngelResponse(prompt, history, language)
                 }
                 val reader = response.body?.charStream()?.buffered() ?: return@withContext localMessage(
                     language, "Sir, server response khaali hai.", "Sir, the server response was empty.")
@@ -187,16 +185,14 @@ class GeminiApiClient {
                         "error" -> if (full.isEmpty()) full.append(event.optString("message"))
                     }
                 }
-                if (full.isEmpty()) localMessage(language,
-                    "Sir, AI se jawab nahi mila. Thodi der baad try karein.",
-                    "Sir, no AI response was received. Please try again shortly.")
-                else full.toString().trim()
+                if (full.isEmpty()) {
+                    Log.w("GeminiApiClient", "Streaming endpoint returned no answer; retrying through standard chat endpoint")
+                    generateAngelResponse(prompt, history, language)
+                } else full.toString().trim()
             }
         } catch (e: Exception) {
-            Log.w("GeminiApiClient", "Streaming request failed: ${e.javaClass.simpleName}")
-            localMessage(language,
-                "Sir, AI server connection mein problem hui. Dobara try karein.",
-                "Sir, the AI server connection failed. Please try again.")
+            Log.w("GeminiApiClient", "Streaming request failed: ${e.javaClass.simpleName}; retrying through standard chat endpoint")
+            generateAngelResponse(prompt, history, language)
         }
     }
 
