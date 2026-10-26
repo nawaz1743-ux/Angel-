@@ -45,7 +45,7 @@ export interface ChatTurn {
 export const GEMINI_FREE_TIER_MODELS = [
   'gemini-3.8-flash',
   'gemini-3.5-flash-lite',
-  'gemini-2.5-flash',
+  'gemini-3.6-flash',
 ];
 
 // OpenAI models (Paid API account required; no free public API tier guaranteed)
