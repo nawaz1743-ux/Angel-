@@ -168,6 +168,8 @@ class GeminiApiClient {
                 val reader = response.body?.charStream()?.buffered() ?: return@withContext localMessage(
                     language, "Sir, server response khaali hai.", "Sir, the server response was empty.")
                 val full = StringBuilder()
+                var receivedActualChunk = false
+                var streamReportedError = false
                 while (true) {
                     val line = reader.readLine() ?: break
                     if (line.isBlank()) continue
@@ -176,17 +178,21 @@ class GeminiApiClient {
                         "chunk" -> {
                             val piece = event.optString("text")
                             if (piece.isNotEmpty()) {
+                                receivedActualChunk = true
                                 full.append(piece)
                                 val partial = full.toString()
                                 withContext(Dispatchers.Main) { onPartial(partial) }
                             }
                         }
                         "done" -> lastUsedModel = event.optString("provider").takeIf { it.isNotBlank() }
-                        "error" -> if (full.isEmpty()) full.append(event.optString("message"))
+                        "error" -> {
+                            streamReportedError = true
+                            Log.w("GeminiApiClient", "Streaming endpoint reported an error before a real answer")
+                        }
                     }
                 }
-                if (full.isEmpty()) {
-                    Log.w("GeminiApiClient", "Streaming endpoint returned no answer; retrying through standard chat endpoint")
+                if (!receivedActualChunk || full.isEmpty() || streamReportedError && full.isEmpty()) {
+                    Log.w("GeminiApiClient", "Streaming produced no real answer; retrying through standard chat endpoint")
                     generateAngelResponse(prompt, history, language)
                 } else full.toString().trim()
             }
