@@ -128,10 +128,20 @@ class ActionCommandRouter(private val context: Context) {
             return actionResult(AngelAccessibilityService.scroll(false), "Screen upar scroll ho gayi.", "Scroll nahi ho paya. Accessibility Service enabled hai ya nahi check karein.")
         }
 
-        if (normalized in listOf("read screen", "screen padho", "screen padh kar sunao", "what is on my screen")) {
-            return AngelAccessibilityService.captureVisibleScreenText().also {
-                if (it.isNotBlank()) Unit
-            }
+        val isExplicitScreenRead = normalized in listOf(
+            "read screen", "read my screen", "screen padho", "screen padh kar sunao",
+            "screen pe kya likha hai", "screen par kya likha hai", "screen par kya hai",
+            "screen dekh kar batao", "meri screen padho", "meri screen par kya hai",
+            "what is on my screen", "what's on my screen", "tell me what's on my screen",
+            "read what's on my screen", "screen ko padh kar batao"
+        ) || normalized.startsWith("screen par kya likha hai ") ||
+            normalized.startsWith("screen pe kya likha hai ") ||
+            normalized.startsWith("meri screen par kya likha hai ") ||
+            normalized.startsWith("screen dekh kar batao ") ||
+            normalized.startsWith("what is written on my screen")
+
+        if (isExplicitScreenRead) {
+            return AngelAccessibilityService.captureVisibleScreenText()
         }
 
         val tapTarget = command.matchCommand(
