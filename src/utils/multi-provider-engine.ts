@@ -39,11 +39,13 @@ export interface ChatTurn {
   text: string;
 }
 
-// Gemini execution order: preferred model first, compatible lightweight fallback second.
-// API billing/free-tier availability is controlled by Google's account/project quota.
+// Gemini execution order: requested models first, then a broadly supported fallback.
+// A model can be unavailable to a particular API project even when the key is valid.
+// Keep the stable fallback last so it is only used when both preferred models fail.
 export const GEMINI_FREE_TIER_MODELS = [
   'gemini-3.8-flash',
   'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
 ];
 
 // OpenAI models (Paid API account required; no free public API tier guaranteed)
