@@ -172,9 +172,9 @@ app.get('/api/providers', (_req: Request, res: Response) => {
         : 'ready',
       isFreeTierEligible: true,
       details: isGeminiQuotaExhausted
-        ? 'Free tier quota exhausted (429 received from Google API). Will retry automatically.'
+        ? 'A Gemini quota error was recently received. Model fallback remains enabled.'
         : geminiApiKey
-        ? 'Preferred Gemini model: gemini-3.8-flash; fallback: gemini-3.5-flash-lite.'
+        ? 'Gemini is configured. Requests try gemini-3.8-flash, gemini-3.5-flash-lite, then gemini-3.6-flash with low thinking latency.'
         : 'GEMINI_API_KEY not configured.',
       supportedModels: GEMINI_FREE_TIER_MODELS,
     },
@@ -278,6 +278,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
             config: {
               systemInstruction,
               temperature: 0.7,
+              thinkingConfig: { thinkingLevel: 'low' },
             },
           });
 
@@ -440,7 +441,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
         const stream = await ai.models.generateContentStream({
           model: candidate.model,
           contents,
-          config: { systemInstruction, temperature: 0.7 },
+          config: { systemInstruction, temperature: 0.7, thinkingConfig: { thinkingLevel: 'low' } },
         });
         let modelText = '';
         for await (const chunk of stream) {
@@ -558,6 +559,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
     hasGeminiKey: Boolean(geminiApiKey),
     hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY || process.env.OPENAI_KEY),
     timestamp: new Date().toISOString(),
+    geminiConfigured: Boolean(ai && geminiApiKey),
+    preferredGeminiModel: 'gemini-3.8-flash',
+    fallbackGeminiModels: GEMINI_FREE_TIER_MODELS.slice(1),
   });
 });
 
