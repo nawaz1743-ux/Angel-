@@ -3,6 +3,8 @@ package com.angel.assistant.voice
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -30,6 +32,12 @@ class VoiceManager(
 
     private var currentUtteranceId: String? = null
     private var pendingUtterances: Int = 0
+
+    private val recognitionResetHandler = Handler(Looper.getMainLooper())
+    private val recognitionResetRunnable = Runnable {
+        recognitionBusy = false
+        onRecognitionStateChanged(false)
+    }
 
     companion object {
         private const val TAG = "VoiceManager"
@@ -176,6 +184,7 @@ class VoiceManager(
         }
 
         return try {
+            recognitionResetHandler.removeCallbacks(recognitionResetRunnable)
             recognitionActive = true
             recognitionBusy = true
             onRecognitionStateChanged(true)
@@ -193,6 +202,8 @@ class VoiceManager(
     fun stopListening() {
         // Keep recognitionBusy set until Android confirms the session has ended.
         // This prevents a second startListening call during SpeechRecognizer teardown.
+        // If Android never emits the terminal callback, release the lock after a short timeout
+        // so the mic can recover and the user can continue speaking.
         recognitionActive = false
         onRecognitionStateChanged(false)
         try {
@@ -200,6 +211,8 @@ class VoiceManager(
         } catch (e: Exception) {
             Log.e(TAG, "stopListening error: ${e.message}", e)
         }
+        recognitionResetHandler.removeCallbacks(recognitionResetRunnable)
+        recognitionResetHandler.postDelayed(recognitionResetRunnable, 800L)
     }
 
     /**
@@ -479,6 +492,7 @@ class VoiceManager(
             override fun onEndOfSpeech() {}
 
             override fun onError(error: Int) {
+                recognitionResetHandler.removeCallbacks(recognitionResetRunnable)
                 recognitionActive = false
                 recognitionBusy = false
                 onRecognitionStateChanged(false)
@@ -491,6 +505,7 @@ class VoiceManager(
                     SpeechRecognizer.RESULTS_RECOGNITION
                 )
                 val text = matches?.firstOrNull() ?: ""
+                recognitionResetHandler.removeCallbacks(recognitionResetRunnable)
                 recognitionActive = false
                 recognitionBusy = false
                 // Deliver final text before marking recognition idle so Hands-Free cannot
@@ -516,6 +531,7 @@ class VoiceManager(
 
     fun destroy() {
         try {
+            recognitionResetHandler.removeCallbacks(recognitionResetRunnable)
             isTtsReady = false
             speechRecognizer?.destroy()
             speechRecognizer = null
