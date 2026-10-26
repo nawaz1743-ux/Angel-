@@ -404,8 +404,8 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
-    res.write(JSON.stringify({ type: 'chunk', text: reply }) + '\\n');
-    res.write(JSON.stringify({ type: 'done', provider: 'angel-local-date-engine' }) + '\\n');
+    res.write(JSON.stringify({ type: 'chunk', text: reply }) + '\n');
+    res.write(JSON.stringify({ type: 'done', provider: 'angel-local-date-engine' }) + '\n');
     res.end();
     return;
   }
