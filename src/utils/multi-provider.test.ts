@@ -32,8 +32,8 @@ test('Multi-Provider: Default plan prioritizes Gemini free-tier models and block
   assert.ok(plan.candidates.length > 0, 'Should have candidate models');
   assert.equal(plan.candidates.every((c) => c.provider === 'gemini'), true, 'All candidates must be Gemini when paid usage is disabled');
   assert.equal(plan.candidates[0].model, GEMINI_FREE_TIER_MODELS[0]);
-  assert.deepEqual(GEMINI_FREE_TIER_MODELS, ['gemini-3.5-flash-lite'], 'Only Gemini 3.5 Flash-Lite may be configured');
-  assert.equal(plan.candidates.filter((c) => c.provider === 'gemini').length, 1, 'Exactly one Gemini model request may be planned');
+  assert.deepEqual(GEMINI_FREE_TIER_MODELS, ['gemini-3.8-flash', 'gemini-3.5-flash-lite'], 'Primary and fallback Gemini models must both be configured');
+  assert.equal(plan.candidates.filter((c) => c.provider === 'gemini').length, 2, 'Both Gemini primary and fallback models must be planned');
   assert.equal(plan.candidates[0].isPaid, false, 'Gemini models must be flagged as free-tier');
 });
 
@@ -50,9 +50,11 @@ test('Multi-Provider: Gemini quota exhaustion (429) triggers fallback to OpenAI 
 
   // Gemini is cooled down due to 429 quota exhaustion, so it must fall back to OpenAI
   assert.ok(plan.candidates.length > 0, 'Should have fallback candidates');
-  assert.equal(plan.candidates[0].provider, 'openai', 'Should fallback to OpenAI when Gemini quota is exhausted');
-  assert.equal(plan.candidates[0].model, OPENAI_MODELS[0]);
-  assert.equal(plan.candidates[0].isPaid, true);
+  assert.equal(plan.candidates[0].provider, 'gemini', 'Try Gemini model cascade before any paid provider');
+  assert.deepEqual(plan.candidates.filter((c) => c.provider === 'gemini').map((c) => c.model), GEMINI_FREE_TIER_MODELS);
+  assert.equal(plan.candidates[2].provider, 'openai', 'OpenAI may follow only when paid usage is explicitly authorized');
+  assert.equal(plan.candidates[2].model, OPENAI_MODELS[0]);
+  assert.equal(plan.candidates[2].isPaid, true);
 });
 
 test('Multi-Provider Cost Control: Paid requests are strictly blocked when allowPaidUsage is false', () => {
@@ -67,8 +69,8 @@ test('Multi-Provider Cost Control: Paid requests are strictly blocked when allow
   });
 
   // Both Gemini is 429 and OpenAI is not authorized
-  assert.equal(plan.candidates.length, 0, 'No candidates should be executed when free is exhausted and paid is disabled');
-  assert.ok(plan.blockedPaidProviderReason, 'Must provide an explicit explanation of blocked paid usage');
+  assert.equal(plan.candidates.length, 2, 'Both configured Gemini models should still be attempted during cooldown');
+  assert.ok(plan.candidates.every((c) => c.provider === 'gemini'), 'Paid providers must remain blocked without consent');
   assert.ok(plan.blockedPaidProviderReason.includes('Allow paid API usage'));
 });
 
