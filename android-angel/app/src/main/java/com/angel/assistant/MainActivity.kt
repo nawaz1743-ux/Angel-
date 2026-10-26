@@ -229,6 +229,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun resetVoiceUiState(clearTranscript: Boolean = true) {
+        if (clearTranscript) {
+            transcriptState.value = ""
+        }
+        isFinalTranscriptState.value = false
+        isProcessingState.value = false
+        isListeningState.value = false
+    }
+
     @Composable
     private fun AngelAppContent() {
         var currentScreen by remember {
@@ -249,6 +258,10 @@ class MainActivity : ComponentActivity() {
                 Screen.CHAT -> Screen.HOME
                 Screen.SETTINGS, Screen.SMART_ADS, Screen.APPROVALS, Screen.PRODUCTIVITY -> Screen.MENU
                 Screen.HOME -> Screen.HOME
+            }
+            if (currentScreen != Screen.CHAT) {
+                voiceManager.stopListening()
+                resetVoiceUiState(true)
             }
         }
 
@@ -276,12 +289,10 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(wakeWordTriggered) {
             if (wakeWordTriggered) {
                 currentScreen = Screen.CHAT
-                transcriptState.value = ""
-                isFinalTranscriptState.value = false
-                isProcessingState.value = false
+                resetVoiceUiState(true)
+                isHandsFreeEnabledState.value = true
                 wakeWordTriggeredState.value = false
                 delay(100L)
-                isHandsFreeEnabledState.value = true
             }
         }
 
@@ -495,10 +506,7 @@ class MainActivity : ComponentActivity() {
             if (isHandsFreeEnabledState.value) {
                 isHandsFreeEnabledState.value = false
                 voiceManager.stopListening()
-                isListeningState.value = false
-                isProcessingState.value = false
-                transcriptState.value = ""
-                isFinalTranscriptState.value = false
+                resetVoiceUiState(true)
                 return
             }
 
@@ -507,6 +515,7 @@ class MainActivity : ComponentActivity() {
                 // transcript. Polling here raced the callback and could delay or discard
                 // a transcript that was already visible in the input field.
                 voiceManager.stopListening()
+                resetVoiceUiState(true)
                 isListeningState.value = false
             } else {
                 if (
@@ -519,8 +528,7 @@ class MainActivity : ComponentActivity() {
                     return
                 }
 
-                transcriptState.value = ""
-                isFinalTranscriptState.value = false
+                resetVoiceUiState(true)
                 if (!voiceManager.startListening(currentLanguage)) {
                     Toast.makeText(
                         this@MainActivity,
@@ -537,12 +545,9 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(isFinalTranscript) {
             if (isFinalTranscript) {
                 val spoken = transcriptState.value.trim()
-                transcriptState.value = ""
-                isFinalTranscriptState.value = false
+                resetVoiceUiState(true)
                 if (spoken.isNotBlank()) {
                     handleSendMessage(spoken)
-                } else {
-                    isProcessingState.value = false
                 }
             }
         }
@@ -551,8 +556,7 @@ class MainActivity : ComponentActivity() {
             if (isHandsFreeEnabled && currentScreen != Screen.CHAT) {
                 isHandsFreeEnabledState.value = false
                 voiceManager.stopListening()
-                isListeningState.value = false
-                isProcessingState.value = false
+                resetVoiceUiState(true)
                 return@LaunchedEffect
             }
 
@@ -643,7 +647,7 @@ class MainActivity : ComponentActivity() {
                     chatInitialPrompt = if (currentLanguage == AssistantLanguage.HINGLISH) {
                         "Writing Assistant: Mere liye jo text chahiye use draft karo. Pehle audience, purpose aur tone samajh kar concise, ready-to-use draft do. Agar details missing hain, ek short clarification poochho."
                     } else {
-                        "Writing Assistant: Help me draft the text I need. Consider audience, purpose, and tone, then provide a concise ready-to-use draft. Ask one brief clarification if essential details are missing."
+                        "Writing Assistant: Help me draft the text I need. Consider audience, purpose, and tone, then provide a concise ready-to-use draft. Ask one brief clarification if essential."
                     }
                     currentScreen = Screen.CHAT
                 },
@@ -689,9 +693,9 @@ class MainActivity : ComponentActivity() {
                 onHandsFree = {
                     currentScreen = Screen.CHAT
                     if (ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.RECORD_AUDIO
-                        ) != PackageManager.PERMISSION_GRANTED
+                        this@MainActivity,
+                        Manifest.permission.RECORD_AUDIO
+                    ) != PackageManager.PERMISSION_GRANTED
                     ) {
                         checkAndRequestPermissions()
                         Toast.makeText(
@@ -701,10 +705,7 @@ class MainActivity : ComponentActivity() {
                         ).show()
                     } else {
                         isHandsFreeEnabledState.value = true
-                        isProcessingState.value = false
-                        isListeningState.value = false
-                        transcriptState.value = ""
-                        isFinalTranscriptState.value = false
+                        resetVoiceUiState(true)
                         // Let the single Hands-Free effect start recognition. Starting here too
                         // can race with Compose and create duplicate/busy recognizer sessions.
                     }
@@ -802,8 +803,8 @@ class MainActivity : ComponentActivity() {
                 isWakeWordEnabled = isWakeWordEnabled,
                 onToggleWakeWord = { enabled ->
                     if (enabled && ContextCompat.checkSelfPermission(
-                            this@MainActivity, Manifest.permission.RECORD_AUDIO
-                        ) != PackageManager.PERMISSION_GRANTED
+                        this@MainActivity, Manifest.permission.RECORD_AUDIO
+                    ) != PackageManager.PERMISSION_GRANTED
                     ) {
                         checkAndRequestPermissions()
                         Toast.makeText(this@MainActivity, "Sir, microphone permission allow karke Wake-word dobara enable karein.", Toast.LENGTH_LONG).show()
